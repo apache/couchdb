@@ -245,7 +245,8 @@
     "index info lists every index with its per index info object",
     "index info pages design docs like _design_docs",
     "index info reports mango indexes by the ddoc and name _index uses",
-    "index info takes keys like _design_docs and caps the design docs"
+    "index info takes keys like _design_docs and caps the design docs",
+    "index info type in the body or query params"
   ],
   "InvalidDocIDsTest": [
     "_local-prefixed ids are illegal",

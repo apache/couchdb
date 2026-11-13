@@ -35,6 +35,12 @@ defmodule IndexInfoTest do
     }
   }
 
+  # Make some indexes unavailable
+  @unavailable [
+    %{section: "nouveau", key: "enable", value: "false"},
+    %{section: "dreyfus", key: "name", value: "clouseau_none@127.0.0.1"}
+  ]
+
   defp index_info(db_name, query \\ []) do
     resp = Couch.get("/#{db_name}/_index_info", query: query)
 
@@ -45,6 +51,12 @@ defmodule IndexInfoTest do
   end
 
   defp view_group_ddocs(body), do: Enum.map(body["view_indexes"], & &1["ddoc"])
+
+  # how many view, search and nouveau entries we got
+  defp counts(body) do
+    lists = ["view_indexes", "search_indexes", "nouveau_indexes"]
+    Enum.map(lists, &length(body[&1]))
+  end
 
   defp view_group(body, ddoc) do
     [entry] = Enum.filter(body["view_indexes"], &(&1["ddoc"] == ddoc))
@@ -84,12 +96,7 @@ defmodule IndexInfoTest do
     copies = shard_copies(db_name)
 
     # These are not available, we want to test that scenario
-    unavailable = [
-      %{section: "nouveau", key: "enable", value: "false"},
-      %{section: "dreyfus", key: "name", value: "clouseau_none@127.0.0.1"}
-    ]
-
-    run_on_modified_server(unavailable, fn ->
+    run_on_modified_server(@unavailable, fn ->
       body = index_info(db_name)
       assert Enum.sort(Map.keys(body)) == @keys
       # two design docs, all returned, no next page => bookmark is null
@@ -386,5 +393,74 @@ defmodule IndexInfoTest do
       assert resp.status_code == 200
       assert view_group_ddocs(resp.body) == ["_design/a", "_design/c"]
     end)
+  end
+
+  @tag :with_db
+  test "index info type in the body or query params", context do
+    db_name = context[:db_name]
+    {:ok, _} = create_doc(db_name, @cookbook)
+    {:ok, _} = create_doc(db_name, ddoc_with_view("_design/zzz"))
+
+    run_on_modified_server(@unavailable, fn ->
+      # 2 views, 1 search and 1 nouveau index
+      assert counts(index_info(db_name)) == [2, 1, 1]
+      assert counts(index_info(db_name, type: "search")) == [0, 1, 0]
+      assert counts(index_info(db_name, type: "view,nouveau")) == [2, 0, 1]
+
+      # for bodies we expect a list
+      for {type, expected} <- [
+            {["view"], [2, 0, 0]},
+            {["nouveau", "view"], [2, 0, 1]},
+            {["view", "search", "nouveau", "view"], [2, 1, 1]}
+          ] do
+        resp = Couch.post("/#{db_name}/_index_info", body: %{type: type})
+        assert resp.status_code == 200, "type #{inspect(type)}: #{inspect(resp.body)}"
+        assert Enum.sort(Map.keys(resp.body)) == @keys
+        assert counts(resp.body) == expected, "type #{inspect(type)}"
+      end
+
+      # along with the other parameters in the body
+      body = %{type: ["search"], keys: ["_design/cookbook", "_design/zzz"]}
+      resp = Couch.post("/#{db_name}/_index_info", body: body)
+      assert resp.status_code == 200
+      assert counts(resp.body) == [0, 1, 0]
+      [search] = resp.body["search_indexes"]
+      assert {search["ddoc"], search["name"]} == {"_design/cookbook", "strings"}
+
+      # query wins if we got both
+      query = [type: "view", limit: 1]
+      body = %{type: ["search"], limit: 2}
+      resp = Couch.post("/#{db_name}/_index_info", query: query, body: body)
+      assert resp.status_code == 200
+      assert counts(resp.body) == [1, 0, 0]
+      assert view_group_ddocs(resp.body) == ["_design/cookbook"]
+    end)
+
+    invalid = "Invalid type: foo. Must be view, search or nouveau"
+    not_a_list = "`type` must be an array"
+
+    for {type, reason} <- [
+          {["foo"], invalid},
+          {["view", "foo"], invalid},
+          {[], "`type` must not be empty"},
+          {"search", not_a_list},
+          {"view,search", not_a_list},
+          {"", not_a_list},
+          {1, not_a_list},
+          {nil, not_a_list},
+          {["view", 1], not_a_list},
+          {%{view: true}, not_a_list}
+        ] do
+      resp = Couch.post("/#{db_name}/_index_info", body: %{type: type})
+      assert resp.status_code == 400, "type #{inspect(type)}: #{inspect(resp.body)}"
+      assert resp.body["error"] == "query_parse_error"
+      assert resp.body["reason"] == reason
+    end
+
+    # an invalid type in the body is a 400 error
+    body = %{type: ["foo"]}
+    resp = Couch.post("/#{db_name}/_index_info", query: [type: "view"], body: body)
+    assert resp.status_code == 400
+    assert resp.body["reason"] == invalid
   end
 end
