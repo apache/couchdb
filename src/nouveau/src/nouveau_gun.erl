@@ -23,6 +23,7 @@
 
 -export([start_link/0]).
 -export([request/4]).
+-export([server_flavour/0]).
 
 %%% gen_server callbacks
 -export([init/1]).
@@ -42,11 +43,30 @@
     gun_mref
 }).
 
+-define(NOUVEAU_SERVER_FLAVOUR, nouveau_server_flavour).
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 request(Method, Path, Headers, Body) ->
     gen_server:call(?MODULE, {request, Method, Path, Headers, Body, #{reply_to => self()}}).
+
+server_flavour() ->
+    case persistent_term:get(?NOUVEAU_SERVER_FLAVOUR, undefined) of
+        undefined ->
+            case nouveau_api:openapi() of
+                {ok, OpenAPI} ->
+                    ServerFlavour = server_flavour(OpenAPI),
+                    persistent_term:put(?NOUVEAU_SERVER_FLAVOUR, ServerFlavour),
+                    ServerFlavour;
+                {error, _Reason} ->
+                    %% return the current setting, if we're wrong the next request will fail
+                    %% anyway.
+                    query
+            end;
+        ServerFlavour ->
+            ServerFlavour
+    end.
 
 init(_) ->
     ok = config:listen_for_changes(?MODULE, nil),
@@ -88,6 +108,7 @@ handle_info(
     {'DOWN', GunMRef, process, GunPid, Reason}, #state{gun_pid = GunPid, gun_mref = GunMRef} = State
 ) ->
     couch_log:warning("Nouveau down for reason ~p", [Reason]),
+    persistent_term:erase(?NOUVEAU_SERVER_FLAVOUR),
     {noreply, State#state{gun_pid = undefined, gun_mref = undefined}};
 handle_info(Msg, State) ->
     couch_log:warning("~p received unexpected message: ~p", [?MODULE, Msg]),
@@ -208,3 +229,10 @@ verify(false) ->
     verify_none;
 verify(true) ->
     verify_peer.
+
+%% Nouveau switched to query parameter for passing the index name to avoid
+%% ambiguous URI restrictions in new version of Jetty.
+server_flavour(#{~"paths" := #{~"/index/update" := _, ~"/index/search" := _}}) ->
+    query;
+server_flavour(#{~"paths" := #{~"/index/{name}/update" := _, ~"/index/{name}/search" := _}}) ->
+    path.
