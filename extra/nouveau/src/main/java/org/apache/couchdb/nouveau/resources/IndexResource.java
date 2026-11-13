@@ -69,20 +69,6 @@ public final class IndexResource {
         return Ok.INSTANCE;
     }
 
-    @Deprecated(since = "3.5.2", forRemoval = true)
-    @DELETE
-    @Path("/doc/{docId}")
-    public Ok deleteDoc(
-            @PathParam("name") String name,
-            @PathParam("docId") String docId,
-            @NotNull @Valid DocumentDeleteRequest request)
-            throws Exception {
-        return indexManager.with(name, (index) -> {
-            index.delete(docId, request);
-            return Ok.INSTANCE;
-        });
-    }
-
     @DELETE
     public Ok deletePath(@PathParam("name") String path, @Valid final List<String> exclusions) throws IOException {
         indexManager.deleteAll(path, exclusions);
@@ -124,20 +110,6 @@ public final class IndexResource {
             throws Exception {
         return indexManager.with(name, (index) -> {
             return index.search(request);
-        });
-    }
-
-    @Deprecated(since = "3.5.2", forRemoval = true)
-    @PUT
-    @Path("/doc/{docId}")
-    public Ok updateDoc(
-            @PathParam("name") String name,
-            @PathParam("docId") String docId,
-            @NotNull @Valid DocumentUpdateRequest request)
-            throws Exception {
-        return indexManager.with(name, (index) -> {
-            index.update(docId, request);
-            return Ok.INSTANCE;
         });
     }
 
