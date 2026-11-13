@@ -538,19 +538,21 @@ handle_design_info_req(Req, _Db, _DDoc) ->
 % _design_doc paging parameters: startkey, endkey, limit, etc.
 handle_index_info_req(#httpd{method = 'GET', path_parts = [_, _]} = Req, Db) ->
     Args = couch_mrview_http:parse_params(Req, undefined),
-    index_info_req(Req, Db, Args);
+    Types = parse_index_info_types(chttpd:qs(Req), []),
+    index_info_req(Req, Db, Types, Args);
 handle_index_info_req(#httpd{method = 'POST', path_parts = [_, _]} = Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
-    Keys = couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)),
-    Args = couch_mrview_http:parse_body_and_query(Req, Keys),
-    index_info_req(Req, Db, Args);
+    {Props} = Body = chttpd:json_body_obj(Req),
+    Keys = couch_mrview_util:get_view_keys(Body),
+    Args = couch_mrview_http:parse_body_and_query(Req, Body, Keys),
+    Types = parse_index_info_types(chttpd:qs(Req), Props),
+    index_info_req(Req, Db, Types, Args);
 handle_index_info_req(#httpd{path_parts = [_, _]} = Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
 handle_index_info_req(Req, _Db) ->
     chttpd:send_error(Req, not_found).
 
-index_info_req(Req, Db, #mrargs{keys = Keys} = Args) ->
-    Types = parse_types(Req),
+index_info_req(Req, Db, Types, #mrargs{keys = Keys} = Args) ->
     Default = ?MAX_DDOC_NUM_FOR_INDEX_INFO,
     Max = config:get_integer("chttpd", "max_ddoc_number_for_index_info_req", Default),
     case is_list(Keys) andalso length(Keys) > Max of
@@ -577,18 +579,34 @@ meta_to_json(Meta) ->
         {bookmark, couch_util:get_value(bookmark, Meta, null)}
     ].
 
-% Types for _index_info. Must be one or more of view, search, nouveau
-parse_types(Req) ->
-    TypeArgs = [V || {K, V} <- chttpd:qs(Req), K == "type"],
-    case TypeArgs of
-        [] ->
-            [view, search, nouveau];
-        [_ | _] ->
-            Tokens = lists:flatmap(fun(V) -> string:tokens(V, ",") end, TypeArgs),
-            case lists:usort(lists:map(fun parse_type/1, Tokens)) of
-                [] -> throw({query_parse_error, ~"`type` must not be empty"});
-                Types -> [T || T <- [view, search, nouveau], lists:member(T, Types)]
-            end
+% Types for _index_info, view, search or nouveau. Specifying none, means all
+parse_index_info_types(Qs, BodyProps) ->
+    BodyType = couch_util:get_value(~"type", BodyProps),
+    BodyTypes = to_types(body_types(BodyType), [view, search, nouveau]),
+    to_types(qs_types(Qs), BodyTypes).
+
+% Split query param types by comma
+qs_types(Qs) ->
+    case [V || {K, V} <- Qs, K == "type"] of
+        [] -> undefined;
+        [_ | _] = Vals -> lists:flatmap(fun(V) -> string:tokens(V, ",") end, Vals)
+    end.
+
+% For POST request body, types should be a list
+body_types(undefined) ->
+    undefined;
+body_types(Types) ->
+    case is_list(Types) andalso lists:all(fun is_binary/1, Types) of
+        true -> lists:map(fun binary_to_list/1, Types);
+        false -> throw({query_parse_error, ~"`type` must be an array"})
+    end.
+
+to_types(undefined, Default) ->
+    Default;
+to_types(Tokens, _Default) ->
+    case lists:usort(lists:map(fun parse_type/1, Tokens)) of
+        [] -> throw({query_parse_error, ~"`type` must not be empty"});
+        Types -> [T || T <- [view, search, nouveau], lists:member(T, Types)]
     end.
 
 parse_type("view") ->
@@ -2918,6 +2936,26 @@ index_info_type_filter_test_() ->
         ],
         index_info_to_json(ByType)
     ).
+
+index_info_parse_types_test_() ->
+    All = [view, search, nouveau],
+    % {Types, QueryString, BodyProps}
+    Cases = [
+        {All, [], []},
+        {All, [{"other", "1"}], [{~"other", 1}]},
+        % query param
+        {[search], [{"type", "search"}], []},
+        {[view, nouveau], [{"type", "nouveau,view"}], []},
+        {[view, search], [{"type", "search"}, {"type", "view,search"}], []},
+        % in the body
+        {[search], [], [{~"type", [~"search"]}]},
+        {[view, nouveau], [], [{~"type", [~"nouveau", ~"view", ~"nouveau"]}]},
+        {All, [], [{~"type", [~"search", ~"nouveau", ~"view"]}]},
+        % query param wins (for consistency with the rest of the apis)
+        {[view], [{"type", "view"}], [{~"type", [~"search"]}]},
+        {[search, nouveau], [{"type", "nouveau,search"}], [{~"type", [~"view"]}]}
+    ],
+    [?_assertEqual(Types, parse_index_info_types(Qs, Body)) || {Types, Qs, Body} <- Cases].
 
 parse_partitioned_opt_test_() ->
     {

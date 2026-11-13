@@ -261,7 +261,10 @@
     :<header Content-Type: :mimetype:`application/json`
     :<json array keys: Doc IDs of the design docs to report, for example
                        ``["_design/cookbook"]``. Other :get:`/{db}/_index_info`
-                       parameters can provided in the body as well. *Optional*
+                       parameters can be provided in the body as well. *Optional*
+    :<json array type: Filter by type. An array with one or more of: ``view``,
+                       ``search`` and ``nouveau``, for example ``["view",
+                       "search"]``. *Optional*, default: all types.
     :>header Content-Type: - :mimetype:`application/json`
                            - :mimetype:`text/plain; charset=utf-8`
     :>json number total_rows: Number of design docs in the database. Same as
@@ -282,7 +285,7 @@
 
     .. code-block:: http
 
-        POST /recipes/_index_info?type=search HTTP/1.1
+        POST /recipes/_index_info HTTP/1.1
         Accept: application/json
         Content-Type: application/json
         Host: localhost:5984
@@ -290,6 +293,9 @@
         {
             "keys": [
                 "_design/cookbook"
+            ],
+            "type": [
+                "search"
             ]
         }
 
