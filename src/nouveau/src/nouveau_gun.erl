@@ -22,7 +22,7 @@
 -behaviour(config_listener).
 
 -export([start_link/0]).
--export([host_header/0]).
+-export([request/4]).
 
 %%% gen_server callbacks
 -export([init/1]).
@@ -35,24 +35,39 @@
 -export([handle_config_change/5]).
 -export([handle_config_terminate/3]).
 
--define(NOUVEAU_HOST_HEADER, nouveau_host_header).
-
 -record(state, {
     enabled,
-    url
+    url,
+    gun_pid,
+    gun_mref
 }).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-host_header() ->
-    persistent_term:get(?NOUVEAU_HOST_HEADER).
+request(Method, Path, Headers, Body) ->
+    gen_server:call(?MODULE, {request, Method, Path, Headers, Body, #{reply_to => self()}}).
 
 init(_) ->
     ok = config:listen_for_changes(?MODULE, nil),
     State = #state{enabled = false, url = nouveau_util:nouveau_url()},
     {ok, State, {continue, reconfigure}}.
 
+handle_call(
+    {request, Method, Path, Headers, Body, ReqOpts}, From, #state{gun_pid = undefined} = State
+) ->
+    case start_gun(State#state.url) of
+        {ok, GunPid} ->
+            GunMRef = monitor(process, GunPid),
+            handle_call({request, Method, Path, Headers, Body, ReqOpts}, From, State#state{
+                gun_pid = GunPid, gun_mref = GunMRef
+            });
+        {error, Reason} ->
+            {reply, {error, Reason}, State}
+    end;
+handle_call({request, Method, Path, Headers, Body, ReqOpts}, _From, State) ->
+    StreamRef = gun:request(State#state.gun_pid, Method, Path, Headers, Body, ReqOpts),
+    {reply, {State#state.gun_pid, State#state.gun_mref, StreamRef}, State};
 handle_call(_Msg, _From, State) ->
     {reply, unexpected_msg, State}.
 
@@ -64,6 +79,16 @@ handle_info(restart_config_listener, State) ->
     {noreply, State};
 handle_info(reconfigure, State) ->
     reconfigure(new_state(), State);
+handle_info({gun_up, GunPid, http2}, #state{gun_pid = GunPid} = State) ->
+    {noreply, State};
+handle_info({gun_down, GunPid, http2, Reason, KilledStreams}, #state{gun_pid = GunPid} = State) ->
+    couch_log:warning("Nouveau down for reason ~p (killed streams: ~p)", [Reason, KilledStreams]),
+    {noreply, State};
+handle_info(
+    {'DOWN', GunMRef, process, GunPid, Reason}, #state{gun_pid = GunPid, gun_mref = GunMRef} = State
+) ->
+    couch_log:warning("Nouveau down for reason ~p", [Reason]),
+    {noreply, State#state{gun_pid = undefined, gun_mref = undefined}};
 handle_info(Msg, State) ->
     couch_log:warning("~p received unexpected message: ~p", [?MODULE, Msg]),
     {noreply, State}.
@@ -99,13 +124,14 @@ reconfigure(#state{} = State, #state{} = State) ->
     {noreply, State};
 reconfigure(#state{enabled = false} = NewState, #state{enabled = true} = CurrState) ->
     %% turning off
-    stop_gun(CurrState#state.url),
-    {noreply, NewState};
+    stop_gun(CurrState),
+    {noreply, NewState#state{gun_pid = undefined, gun_mref = undefined}};
 reconfigure(#state{enabled = true} = NewState, #state{enabled = false}) ->
     %% turning on
     case start_gun(NewState#state.url) of
-        {ok, _PoolPid} ->
-            {noreply, NewState};
+        {ok, GunPid} ->
+            GunMRef = monitor(process, GunPid),
+            {noreply, NewState#state{gun_pid = GunPid, gun_mref = GunMRef}};
         {error, Reason} ->
             {stop, Reason}
     end;
@@ -114,7 +140,9 @@ reconfigure(#state{enabled = true} = NewState, #state{enabled = true} = CurrStat
 ->
     %% changing url while on
     stop_gun(CurrState#state.url),
-    reconfigure(NewState, CurrState#state{enabled = false});
+    reconfigure(NewState, CurrState#state{
+        enabled = false, gun_pid = undefined, gun_mref = undefined
+    });
 reconfigure(#state{enabled = false} = NewState, #state{enabled = false} = CurrState) when
     NewState#state.url /= CurrState#state.url
 ->
@@ -123,8 +151,6 @@ reconfigure(#state{enabled = false} = NewState, #state{enabled = false} = CurrSt
 
 start_gun(URL) ->
     #{host := Host, port := Port, scheme := Scheme} = uri_string:parse(URL),
-    persistent_term:put(?NOUVEAU_HOST_HEADER, {<<"host">>, [Host, $:, integer_to_binary(Port)]}),
-    PoolSize = config:get_integer("nouveau", "pool_size", 10),
     KeepAliveMS = config:get_integer("nouveau", "keepalive_msec", 10000),
     CACertFile = config:get("nouveau", "ssl_cacert_file"),
     KeyFile = config:get("nouveau", "ssl_key_file"),
@@ -162,11 +188,13 @@ start_gun(URL) ->
             true ->
                 BaseConnOptions
         end,
-    gun_pool:start_pool(Host, Port, #{size => PoolSize, conn_opts => ConnOptions}).
+    gun:open(Host, Port, ConnOptions).
 
-stop_gun(URL) ->
-    #{host := Host, port := Port, scheme := Scheme} = uri_string:parse(URL),
-    gun_pool:stop_pool(Host, Port, #{transport => scheme_to_transport(Scheme)}).
+stop_gun(#state{gun_pid = undefined} = State) ->
+    State;
+stop_gun(#state{} = State) ->
+    ok = gun:close(State#state.gun_pid),
+    demonitor(State#state.gun_mref, [flush]).
 
 remove_undefined(_Key, Value) ->
     Value /= undefined.

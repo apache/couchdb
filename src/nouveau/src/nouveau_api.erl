@@ -367,38 +367,26 @@ send_if_enabled(Path, ReqHeaders, Method) ->
     send_if_enabled(Path, ReqHeaders, Method, <<>>).
 
 send_if_enabled(Path, ReqHeaders, Method, ReqBody) ->
-    send_if_enabled(Path, ReqHeaders, Method, ReqBody, 5).
-
-send_if_enabled(Path, ReqHeaders, Method, ReqBody, RemainingTries) ->
     case nouveau:enabled() of
         true ->
-            case
-                gun_pool:request(
-                    Method,
-                    Path,
-                    [nouveau_gun:host_header() | ReqHeaders],
-                    ReqBody
-                )
-            of
-                {async, PoolStreamRef} ->
-                    Timeout = config:get_integer("nouveau", "request_timeout", 30000),
-                    case gun_pool:await(PoolStreamRef, Timeout) of
-                        {response, fin, Status, RespHeaders} ->
-                            {ok, Status, RespHeaders, []};
-                        {response, nofin, Status, RespHeaders} ->
-                            case gun_pool:await_body(PoolStreamRef, Timeout) of
-                                {ok, RespBody} ->
-                                    {ok, Status, RespHeaders, RespBody};
-                                {error, Reason} ->
-                                    {error, Reason}
-                            end;
+            {GunPid, GunMRef, StreamRef} = nouveau_gun:request(
+                Method,
+                Path,
+                ReqHeaders,
+                ReqBody
+            ),
+            Timeout = config:get_integer("nouveau", "request_timeout", 30000),
+            case gun:await(GunPid, StreamRef, GunMRef) of
+                {response, fin, Status, RespHeaders} ->
+                    {ok, Status, RespHeaders, []};
+                {response, nofin, Status, RespHeaders} ->
+                    case gun:await_body(GunPid, StreamRef, Timeout, GunMRef) of
+                        {ok, RespBody} ->
+                            {ok, Status, RespHeaders, RespBody};
                         {error, Reason} ->
                             {error, Reason}
                     end;
-                {error, no_connection_available, _Reason} when RemainingTries > 0 ->
-                    timer:sleep(1000),
-                    send_if_enabled(Path, ReqHeaders, Method, ReqBody, RemainingTries - 1);
-                {error, _Type, Reason} ->
+                {error, Reason} ->
                     {error, Reason}
             end;
         false ->
