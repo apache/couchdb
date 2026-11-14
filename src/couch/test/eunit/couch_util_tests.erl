@@ -316,3 +316,13 @@ url_strip_password_test() ->
         Cases
     ),
     ?assertEqual(undefined, couch_util:url_strip_password(undefined)).
+
+binary_to_term_safe_too_large_test() ->
+    % Not compressed
+    Bin = term_to_binary(binary:copy(<<0>>, 1000)),
+    ?assertEqual(1000, byte_size(couch_util:binary_to_term_safe(Bin, byte_size(Bin)))),
+    ?assertError({term_too_large, _}, couch_util:binary_to_term_safe(Bin, byte_size(Bin) - 1)),
+    % Compressed
+    Compressed = term_to_binary(binary:copy(<<0>>, 100000), [compressed]),
+    ?assertEqual(100000, byte_size(couch_util:binary_to_term_safe(Compressed, 100005))),
+    ?assertError({term_too_large, 100005}, couch_util:binary_to_term_safe(Compressed, 100004)).

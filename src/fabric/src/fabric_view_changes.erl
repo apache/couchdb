@@ -482,7 +482,7 @@ unpack_seq_term(Opaque) ->
             % Looks like a valid term_to_binary at least
             SeqList =
                 try
-                    binary_to_term(Bin, [safe])
+                    couch_util:binary_to_term_safe(Bin)
                 catch
                     error:badarg -> error(?BADSEQ)
                 end,
