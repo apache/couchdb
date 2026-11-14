@@ -234,16 +234,33 @@ supported_lucene_versions() ->
 
 %% private functions
 
-index_path(Path) when is_binary(Path) ->
-    [<<"/index/">>, couch_util:url_encode(Path)];
-index_path(#index{} = Index) ->
-    [<<"/index/">>, couch_util:url_encode(nouveau_util:index_name(Index))].
+index_path(Arg) ->
+    index_path(nouveau_gun:server_flavour(), Arg).
+
+index_path(path, Path) when is_binary(Path) ->
+    [~"/index/", couch_util:url_encode(Path)];
+index_path(path, #index{} = Index) ->
+    [~"/index/", couch_util:url_encode(nouveau_util:index_name(Index))];
+index_path(query, Path) when is_binary(Path) ->
+    [~"/index?name=", couch_util:url_encode(Path)];
+index_path(query, #index{} = Index) ->
+    [~"/index?name=", couch_util:url_encode(nouveau_util:index_name(Index))].
 
 search_path(#index{} = Index) ->
-    [index_path(Index), <<"/search">>].
+    search_path(nouveau_gun:server_flavour(), Index).
+
+search_path(path, #index{} = Index) ->
+    [index_path(path, Index), ~"/search"];
+search_path(query, #index{} = Index) ->
+    [~"/index/search?name=", couch_util:url_encode(nouveau_util:index_name(Index))].
 
 update_path(#index{} = Index) ->
-    [index_path(Index), <<"/update">>].
+    update_path(nouveau_gun:server_flavour(), Index).
+
+update_path(path, #index{} = Index) ->
+    [index_path(path, Index), <<"/update">>];
+update_path(query, #index{} = Index) ->
+    [~"/index/update?name=", couch_util:url_encode(nouveau_util:index_name(Index))].
 
 jaxrs_error(400, Body) ->
     {bad_request, message(Body)};

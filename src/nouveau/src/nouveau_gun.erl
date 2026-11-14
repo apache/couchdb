@@ -23,6 +23,7 @@
 
 -export([start_link/0]).
 -export([request/4]).
+-export([server_flavour/0]).
 
 %%% gen_server callbacks
 -export([init/1]).
@@ -43,11 +44,16 @@
     openapi
 }).
 
+-define(NOUVEAU_SERVER_FLAVOUR, nouveau_server_flavour).
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 request(Method, Path, Headers, Body) ->
     gen_server:call(?MODULE, {request, Method, Path, Headers, Body, #{reply_to => self()}}).
+
+server_flavour() ->
+    persistent_term:get(?NOUVEAU_SERVER_FLAVOUR, query).
 
 init(_) ->
     ok = config:listen_for_changes(?MODULE, nil),
@@ -100,6 +106,7 @@ handle_info(
     couch_log:warning("Nouveau down for reason ~p", [Reason]),
     {noreply, State#state{gun_pid = undefined, gun_mref = undefined}};
 handle_info({openapi_ok, OpenAPI}, State) ->
+    set_server_flavour(OpenAPI),
     {noreply, State#state{openapi = OpenAPI}};
 handle_info({openapi_error, Reason}, State) ->
     {stop, {error, Reason}, State};
@@ -238,3 +245,13 @@ sync_request(GunPid, GunMRef, Method, Path, ReqHeaders, ReqBody) ->
         {error, Reason} ->
             {error, Reason}
     end.
+
+set_server_flavour(OpenAPI) ->
+    persistent_term:put(?NOUVEAU_SERVER_FLAVOUR, server_flavour(OpenAPI)).
+
+%% Nouveau switched to query parameter for passing the index name to avoid
+%% ambiguous URI restrictions in new version of Jetty.
+server_flavour(#{~"paths" := #{~"/index/update" := _, ~"/index/search" := _}}) ->
+    query;
+server_flavour(#{~"paths" := #{~"/index/{name}/update" := _, ~"/index/{name}/search" := _}}) ->
+    path.
