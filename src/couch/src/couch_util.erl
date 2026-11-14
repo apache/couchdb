@@ -48,6 +48,7 @@
 -export([new_set/0, set_from_list/1]).
 -export([hibernate_after/1]).
 -export([gunzip_with_limit/1, gunzip_with_limit/2]).
+-export([binary_to_term_safe/1, binary_to_term_safe/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -67,6 +68,9 @@
 ]).
 
 -define(DEFAULT_HIBERNATE_AFTER, 5000).
+
+% Max uncompressed size param terms
+-define(TERM_MAX_SIZE, 1048576).
 
 priv_dir() ->
     case code:priv_dir(couch) of
@@ -825,6 +829,24 @@ hibernate_after(Module) when is_atom(Module) ->
         Timeout when is_integer(Timeout) ->
             [{hibernate_after, Timeout}]
     end.
+
+binary_to_term_safe(Bin) ->
+    binary_to_term_safe(Bin, ?TERM_MAX_SIZE).
+
+binary_to_term_safe(Bin, MaxSize) when is_integer(MaxSize), MaxSize >= 0 ->
+    case ext_term_size(Bin) of
+        Size when Size > MaxSize -> error({term_too_large, Size});
+        _ -> binary_to_term(Bin, [safe])
+    end.
+
+ext_term_size(<<131, 80, Size:32, _/binary>> = Bin) ->
+    % See https://www.erlang.org/doc/apps/erts/erl_ext_dist.html
+    max(Size, byte_size(Bin));
+ext_term_size(<<Bin/binary>>) ->
+    byte_size(Bin);
+ext_term_size(_NotBinary) ->
+    % we'll get a badarg in binary_to_term for it
+    0.
 
 gunzip_with_limit(Data) ->
     Limit = chttpd_util:get_chttpd_config_integer("max_http_request_size", 4294967296),
