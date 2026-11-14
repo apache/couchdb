@@ -67,7 +67,7 @@ unpack(DbName, Packed) when is_binary(Packed) ->
     ).
 
 unpack_entries(Packed) ->
-    case binary_to_term(couch_util:decodeBase64Url(Packed), [safe]) of
+    case couch_util:binary_to_term_safe(couch_util:decodeBase64Url(Packed)) of
         Entries when is_list(Entries) ->
             lists:foreach(fun validate_entry/1, Entries),
             Entries;
