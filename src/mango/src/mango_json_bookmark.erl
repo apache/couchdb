@@ -52,7 +52,7 @@ unpack(nil) ->
     nil;
 unpack(Packed) ->
     try
-        Bookmark = binary_to_term(couch_util:decodeBase64Url(Packed), [safe]),
+        Bookmark = couch_util:binary_to_term_safe(couch_util:decodeBase64Url(Packed)),
         verify(Bookmark)
     catch
         _:_ ->

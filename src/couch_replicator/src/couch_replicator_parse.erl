@@ -38,6 +38,9 @@
 -define(VALID_IBROWSE_OPTS, [
     prefer_ipv6
 ]).
+% {K, V} option tuples. K is binary and V = true | false | 0..9
+-define(OPT_RE, "\\{\\s*([a-z][a-z0-9_]*)\\s*,\\s*(true|false|[0-9]{1,9})\\s*\\}").
+-define(OPT_MAX, 1024).
 -define(VALID_PROTOCOLS, #{
     endpoint => [http, https],
     proxy => [http, https, socks5]
@@ -297,34 +300,45 @@ cfg_atoms(Cfg, Default) ->
     end.
 
 cfg_sock_opts() ->
-    CfgTerm = cfg("socket_options"),
-    parse_opts(CfgTerm, ?DEFAULT_SOCK_OPTS, ?VALID_SOCK_OPTS).
+    cfg_opts("socket_options", ?DEFAULT_SOCK_OPTS, ?VALID_SOCK_OPTS).
 
 cfg_ibrowse_opts() ->
-    CfgTerm = cfg("ibrowse_options"),
-    parse_opts(CfgTerm, ?DEFAULT_IBROWSE_OPTS, ?VALID_IBROWSE_OPTS).
+    cfg_opts("ibrowse_options", ?DEFAULT_IBROWSE_OPTS, ?VALID_IBROWSE_OPTS).
 
 cfg(Var) ->
     config:get("replicator", Var).
 
-parse_opts(undefined, Defaults, _) ->
-    Defaults;
-parse_opts(Term, _Defaults, ValidOpts) ->
-    SocketOptions =
-        case couch_util:parse_term(Term) of
-            {ok, Opts} -> Opts;
-            {error, _Error} -> []
-        end,
-    Fun = fun({K, _}) -> lists:member(K, ValidOpts) end,
-    lists:filtermap(Fun, SocketOptions).
+cfg_opts(Var, Defaults, ValidOpts) ->
+    case cfg(Var) of
+        undefined -> Defaults;
+        Val -> parse_opts(list_to_binary(Val), ValidOpts)
+    end.
 
-sock_opts(CfgTerm) ->
+sock_opts(Val) ->
     ValidOpts = cfg_atoms("valid_socket_options", ?VALID_SOCK_OPTS),
-    parse_opts(CfgTerm, ?DEFAULT_SOCK_OPTS, ValidOpts).
+    parse_opts(Val, ValidOpts).
 
-ibrowse_opts(CfgTerm) ->
+ibrowse_opts(Val) ->
     ValidOpts = cfg_atoms("valid_ibrowse_options", ?VALID_IBROWSE_OPTS),
-    parse_opts(CfgTerm, ?DEFAULT_IBROWSE_OPTS, ValidOpts).
+    parse_opts(Val, ValidOpts).
+
+parse_opts(Val, ValidOpts) when is_binary(Val), byte_size(Val) =< ?OPT_MAX ->
+    Names = #{atom_to_binary(Name) => Name || Name <- ValidOpts},
+    case re:run(Val, ?OPT_RE, [global, {capture, all_but_first, binary}]) of
+        {match, Pairs} ->
+            [{map_get(K, Names), opt_val(V)} || [K, V] <- Pairs, is_map_key(K, Names)];
+        nomatch ->
+            []
+    end;
+parse_opts(_, _ValidOpts) ->
+    [].
+
+opt_val(~"true") ->
+    true;
+opt_val(~"false") ->
+    false;
+opt_val(<<Digits/binary>>) ->
+    binary_to_integer(Digits).
 
 -spec convert_options([_]) -> [_].
 convert_options([]) ->
@@ -384,9 +398,9 @@ convert_options([{<<"connection_timeout">>, V} | R]) ->
     [{connection_timeout, couch_util:to_integer(V)} | convert_options(R)];
 convert_options([{<<"retries_per_request">>, V} | R]) ->
     [{retries, couch_util:to_integer(V)} | convert_options(R)];
-convert_options([{<<"socket_options">>, V} | R]) ->
+convert_options([{<<"socket_options">>, V} | R]) when is_binary(V) ->
     [{socket_options, sock_opts(V)} | convert_options(R)];
-convert_options([{<<"ibrowse_options">>, V} | R]) ->
+convert_options([{<<"ibrowse_options">>, V} | R]) when is_binary(V) ->
     [{ibrowse_options, ibrowse_opts(V)} | convert_options(R)];
 convert_options([{<<"since_seq">>, V} | R]) ->
     [{since_seq, V} | convert_options(R)];
@@ -642,7 +656,10 @@ local_replication_endpoint_error_test_() ->
             ?TDEF_FE(t_parse_proxy_invalid_protocol),
             ?TDEF_FE(t_parse_sock_opts),
             ?TDEF_FE(t_parse_ibrowse_opts),
-            ?TDEF_FE(t_parse_opts_invalid)
+            ?TDEF_FE(t_parse_opts_invalid),
+            ?TDEF_FE(t_parse_opts),
+            ?TDEF_FE(t_parse_opts_max_size),
+            ?TDEF_FE(t_parse_opts_no_new_atoms)
         ]
     }.
 
@@ -850,6 +867,71 @@ t_parse_ibrowse_opts(_) ->
     ).
 
 t_parse_opts_invalid(_) ->
-    ?assertEqual([], parse_opts(<<"<}garbage]][">>, [], [])).
+    Ignored = [
+        ~"",
+        ~"randomjunk",
+        ~"<}potato]][",
+        ~"keepalive",
+        ~"[keepalive, nodelay]",
+        ~"[{keepalive}]",
+        ~"[{keepalive, true, true}]",
+        ~"[{'keepalive', true}]",
+        ~"[{keepalive, 'true'}]",
+        ~"[{keepalive, \"true\"}]",
+        ~"[{recbuf, -1}]",
+        ~"[{recbuf, 1.5}]",
+        ~"[{recbuf, 16#ff}]",
+        ~"[{recbuf, 1_000}]",
+        ~"[{recbuf, [1]}]",
+        ~"[{recbuf, 1234567890}]"
+    ],
+    [?assertEqual([], sock_opts(Val), Val) || Val <- Ignored].
+
+t_parse_opts(_) ->
+    ?assertEqual([], sock_opts(~"[]")),
+    ?assertEqual(
+        [{keepalive, true}, {nodelay, false}],
+        sock_opts(~"[{keepalive, true}, {nodelay, false}]")
+    ),
+    ?assertEqual(
+        [{keepalive, false}, {recbuf, 65536}],
+        sock_opts(~"[{keepalive,  false},{ recbuf,65536 } ]")
+    ),
+    % no binaries
+    ?assertEqual([], sock_opts(~"[{recbuf, <<1>>}]")).
+
+t_parse_opts_max_size(_) ->
+    Opts = ~"[{nodelay, true}, {prefer_ipv6, true}]",
+    Pad = fun(Sz) -> <<Opts/binary, (binary:copy(~" ", Sz - byte_size(Opts)))/binary>> end,
+    ?assertEqual([{nodelay, true}], sock_opts(Pad(?OPT_MAX))),
+    ?assertEqual([{prefer_ipv6, true}], ibrowse_opts(Pad(?OPT_MAX))),
+    ?assertEqual([], sock_opts(Pad(?OPT_MAX + 1))),
+    ?assertEqual([], ibrowse_opts(Pad(?OPT_MAX + 1))).
+
+t_parse_opts_no_new_atoms(_) ->
+    [N1, N2, N3] = [new_name() || _ <- lists:seq(1, 3)],
+    F = fun(Fmt, Args) -> iolist_to_binary(io_lib:format(Fmt, Args)) end,
+    ?assertEqual([], sock_opts(F("[~s, '~s']", [N1, N2]))),
+    ?assertEqual([], sock_opts(F("[{~s, 1}, {'~s', true}]", [N1, N2]))),
+    ?assertEqual([], ibrowse_opts(F("[{~s, 1}, {'~s', true}]", [N1, N2]))),
+    ?assertEqual([], sock_opts(F("[{keepalive, ~s}, {recbuf, ['~s']}]", [N3, N3]))),
+    RepDoc =
+        {[
+            {~"source", ~"http://a"},
+            {~"target", ~"http://b"},
+            {~"socket_options", F("[{nodelay, true}, {~s, 1}]", [N1])},
+            {~"ibrowse_options", F("[~s]", [N2])}
+        ]},
+    #rep{options = Options} = parse_rep_doc_without_id(RepDoc),
+    ?assertEqual([{nodelay, true}], get_value(socket_options, Options)),
+    ?assertEqual([], get_value(ibrowse_options, Options)),
+    % We never created those new atoms
+    ?assertError(badarg, binary_to_existing_atom(N1)),
+    ?assertError(badarg, binary_to_existing_atom(N2)),
+    ?assertError(badarg, binary_to_existing_atom(N3)).
+
+new_name() ->
+    Uniq = integer_to_binary(erlang:unique_integer([positive])),
+    <<"anatom_", Uniq/binary>>.
 
 -endif.
