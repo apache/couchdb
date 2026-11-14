@@ -23,9 +23,6 @@
     create_index/2,
     delete_path/1,
     delete_path/2,
-    delete_doc/4,
-    purge_doc/4,
-    update_doc/6,
     search/2,
     set_purge_seq/3,
     set_update_seq/3,
@@ -42,12 +39,6 @@
 ]).
 
 -define(JSON_CONTENT_TYPE, {"Content-Type", "application/json"}).
-
--deprecated([
-    {purge_doc, 4, "replaced by updates/2"},
-    {update_doc, 6, "replaced by updates/2"},
-    {delete_doc, 4, "replaced by updates/2"}
-]).
 
 analyze(Text, Analyzer) when
     is_binary(Text), is_binary(Analyzer)
@@ -103,79 +94,6 @@ delete_path(Path, Exclusions) when
 ->
     Resp = send_if_enabled(
         index_path(Path), [?JSON_CONTENT_TYPE], <<"DELETE">>, jiffy:encode(Exclusions)
-    ),
-    case Resp of
-        {ok, 200, _, _} ->
-            ok;
-        {ok, StatusCode, _, RespBody} ->
-            {error, jaxrs_error(StatusCode, RespBody)};
-        {error, Reason} ->
-            send_error(Reason)
-    end.
-
-delete_doc(#index{} = Index, DocId, MatchSeq, UpdateSeq) when
-    is_binary(DocId),
-    is_integer(MatchSeq),
-    MatchSeq >= 0,
-    is_integer(UpdateSeq),
-    UpdateSeq > 0
-->
-    ReqBody = #{match_seq => MatchSeq, seq => UpdateSeq, purge => false},
-    Resp = send_if_enabled(
-        doc_path(Index, DocId),
-        [?JSON_CONTENT_TYPE],
-        <<"DELETE">>,
-        jiffy:encode(ReqBody)
-    ),
-    case Resp of
-        {ok, 200, _, _} ->
-            ok;
-        {ok, StatusCode, _, RespBody} ->
-            {error, jaxrs_error(StatusCode, RespBody)};
-        {error, Reason} ->
-            send_error(Reason)
-    end.
-
-purge_doc(#index{} = Index, DocId, MatchSeq, PurgeSeq) when
-    is_binary(DocId),
-    is_integer(MatchSeq),
-    MatchSeq >= 0,
-    is_integer(PurgeSeq),
-    PurgeSeq > 0
-->
-    ReqBody = #{match_seq => MatchSeq, seq => PurgeSeq, purge => true},
-    Resp = send_if_enabled(
-        doc_path(Index, DocId), [?JSON_CONTENT_TYPE], <<"DELETE">>, jiffy:encode(ReqBody)
-    ),
-    case Resp of
-        {ok, 200, _, _} ->
-            ok;
-        {ok, StatusCode, _, RespBody} ->
-            {error, jaxrs_error(StatusCode, RespBody)};
-        {error, Reason} ->
-            send_error(Reason)
-    end.
-
-update_doc(#index{} = Index, DocId, MatchSeq, UpdateSeq, Partition, Fields) when
-    is_binary(DocId),
-    is_integer(MatchSeq),
-    MatchSeq >= 0,
-    is_integer(UpdateSeq),
-    UpdateSeq > 0,
-    (is_binary(Partition) orelse Partition == null),
-    is_list(Fields)
-->
-    ReqBody = #{
-        match_seq => MatchSeq,
-        seq => UpdateSeq,
-        partition => Partition,
-        fields => Fields
-    },
-    Resp = send_if_enabled(
-        doc_path(Index, DocId),
-        [?JSON_CONTENT_TYPE],
-        <<"PUT">>,
-        jiffy:encode(ReqBody)
     ),
     case Resp of
         {ok, 200, _, _} ->
@@ -316,24 +234,33 @@ supported_lucene_versions() ->
 
 %% private functions
 
-index_path(Path) when is_binary(Path) ->
-    [<<"/index/">>, couch_util:url_encode(Path)];
-index_path(#index{} = Index) ->
-    [<<"/index/">>, couch_util:url_encode(nouveau_util:index_name(Index))].
+index_path(Arg) ->
+    index_path(nouveau_gun:server_flavour(), Arg).
 
-doc_path(#index{} = Index, DocId) ->
-    [
-        <<"/index/">>,
-        couch_util:url_encode(nouveau_util:index_name(Index)),
-        <<"/doc/">>,
-        couch_util:url_encode(DocId)
-    ].
+index_path(path, Path) when is_binary(Path) ->
+    [~"/index/", couch_util:url_encode(Path)];
+index_path(path, #index{} = Index) ->
+    [~"/index/", couch_util:url_encode(nouveau_util:index_name(Index))];
+index_path(query, Path) when is_binary(Path) ->
+    [~"/index?name=", couch_util:url_encode(Path)];
+index_path(query, #index{} = Index) ->
+    [~"/index?name=", couch_util:url_encode(nouveau_util:index_name(Index))].
 
 search_path(#index{} = Index) ->
-    [index_path(Index), <<"/search">>].
+    search_path(nouveau_gun:server_flavour(), Index).
+
+search_path(path, #index{} = Index) ->
+    [index_path(path, Index), ~"/search"];
+search_path(query, #index{} = Index) ->
+    [~"/index/search?name=", couch_util:url_encode(nouveau_util:index_name(Index))].
 
 update_path(#index{} = Index) ->
-    [index_path(Index), <<"/update">>].
+    update_path(nouveau_gun:server_flavour(), Index).
+
+update_path(path, #index{} = Index) ->
+    [index_path(path, Index), <<"/update">>];
+update_path(query, #index{} = Index) ->
+    [~"/index/update?name=", couch_util:url_encode(nouveau_util:index_name(Index))].
 
 jaxrs_error(400, Body) ->
     {bad_request, message(Body)};
@@ -367,38 +294,26 @@ send_if_enabled(Path, ReqHeaders, Method) ->
     send_if_enabled(Path, ReqHeaders, Method, <<>>).
 
 send_if_enabled(Path, ReqHeaders, Method, ReqBody) ->
-    send_if_enabled(Path, ReqHeaders, Method, ReqBody, 5).
-
-send_if_enabled(Path, ReqHeaders, Method, ReqBody, RemainingTries) ->
     case nouveau:enabled() of
         true ->
-            case
-                gun_pool:request(
-                    Method,
-                    Path,
-                    [nouveau_gun:host_header() | ReqHeaders],
-                    ReqBody
-                )
-            of
-                {async, PoolStreamRef} ->
-                    Timeout = config:get_integer("nouveau", "request_timeout", 30000),
-                    case gun_pool:await(PoolStreamRef, Timeout) of
-                        {response, fin, Status, RespHeaders} ->
-                            {ok, Status, RespHeaders, []};
-                        {response, nofin, Status, RespHeaders} ->
-                            case gun_pool:await_body(PoolStreamRef, Timeout) of
-                                {ok, RespBody} ->
-                                    {ok, Status, RespHeaders, RespBody};
-                                {error, Reason} ->
-                                    {error, Reason}
-                            end;
+            {GunPid, GunMRef, StreamRef} = nouveau_gun:request(
+                Method,
+                Path,
+                ReqHeaders,
+                ReqBody
+            ),
+            Timeout = config:get_integer("nouveau", "request_timeout", 30000),
+            case gun:await(GunPid, StreamRef, GunMRef) of
+                {response, fin, Status, RespHeaders} ->
+                    {ok, Status, RespHeaders, []};
+                {response, nofin, Status, RespHeaders} ->
+                    case gun:await_body(GunPid, StreamRef, Timeout, GunMRef) of
+                        {ok, RespBody} ->
+                            {ok, Status, RespHeaders, RespBody};
                         {error, Reason} ->
                             {error, Reason}
                     end;
-                {error, no_connection_available, _Reason} when RemainingTries > 0 ->
-                    timer:sleep(1000),
-                    send_if_enabled(Path, ReqHeaders, Method, ReqBody, RemainingTries - 1);
-                {error, _Type, Reason} ->
+                {error, Reason} ->
                     {error, Reason}
             end;
         false ->

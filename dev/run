@@ -232,6 +232,20 @@ def get_args_parser():
         dest="with_nouveau",
         default=False,
         action="store_true",
+        help="Enable Nouveau and start server",
+    )
+    parser.add_option(
+        "--enable-nouveau",
+        dest="enable_nouveau",
+        default=False,
+        action="store_true",
+        help="Enable Nouveau",
+    )
+    parser.add_option(
+        "--start-nouveau",
+        dest="start_nouveau",
+        default=False,
+        action="store_true",
         help="Start Nouveau server",
     )
     parser.add_option(
@@ -312,7 +326,8 @@ def setup_context(opts, args):
         "procs": [],
         "auto_ports": opts.auto_ports,
         "locald_configs": opts.locald_configs,
-        "with_nouveau": opts.with_nouveau,
+        "enable_nouveau": opts.enable_nouveau or opts.with_nouveau,
+        "start_nouveau": opts.start_nouveau or opts.with_nouveau,
         "with_clouseau": opts.with_clouseau,
         "no_clouseau_check": opts.no_clouseau_check,
         "clouseau_dir": opts.clouseau_dir or CLOUSEAU_DIR,
@@ -382,7 +397,7 @@ def setup_configs(ctx):
             "backend_port": backend_port,
             "prometheus_port": prometheus_port,
             "uuid": "fake_uuid_for_dev",
-            "nouveau_enable": str(ctx["with_nouveau"]).lower(),
+            "nouveau_enable": str(ctx["enable_nouveau"]).lower(),
             "nouveau_url": "http://127.0.0.1:5987",
             "_default": "",
         }
@@ -450,7 +465,7 @@ def generate_haproxy_config(ctx):
 
 
 def generate_nouveau_config(ctx):
-    if not ctx["with_nouveau"]:
+    if not ctx["enable_nouveau"]:
         return
     src = os.path.join(ctx["rootdir"], "rel", "nouveau.yaml")
     tgt = os.path.join(ctx["devdir"], "lib", "nouveau.yaml")
@@ -571,7 +586,7 @@ def boot_haproxy(ctx):
 
 
 def maybe_boot_nouveau(ctx):
-    if ctx["with_nouveau"]:
+    if ctx["start_nouveau"]:
         return boot_nouveau(ctx)
 
 
