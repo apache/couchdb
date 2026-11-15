@@ -759,9 +759,9 @@ body_length(#httpd{mochi_req = MochiReq}) ->
 body(#httpd{mochi_req = MochiReq, req_body = ReqBody}) ->
     case ReqBody of
         undefined ->
-            % Maximum size of document PUT request body (4GB)
+            % Maximum size of document PUT request body (2GB)
             MaxSize = chttpd_util:get_chttpd_config_integer(
-                "max_http_request_size", 4294967296
+                "max_http_request_size", 2147483647
             ),
             Begin = os:timestamp(),
             try

@@ -570,7 +570,7 @@ validate_ctype(Req, Ctype) ->
 check_max_request_length(Req) ->
     Len = list_to_integer(header_value(Req, "Content-Length", "0")),
     MaxLen = chttpd_util:get_chttpd_config_integer(
-        "max_http_request_size", 4294967296
+        "max_http_request_size", 2147483647
     ),
     case Len > MaxLen of
         true ->
@@ -707,7 +707,7 @@ recv_chunked(#httpd{mochi_req = MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
         ChunkFun,
         InitState,
         chttpd_util:get_chttpd_config_integer(
-            "max_http_request_size", 4294967296
+            "max_http_request_size", 2147483647
         )
     ).
 
@@ -716,7 +716,7 @@ body_length(#httpd{mochi_req = MochiReq}) ->
 
 body(#httpd{mochi_req = MochiReq, req_body = undefined}) ->
     MaxSize = chttpd_util:get_chttpd_config_integer(
-        "max_http_request_size", 4294967296
+        "max_http_request_size", 2147483647
     ),
     MochiReq:recv_body(MaxSize);
 body(#httpd{req_body = ReqBody}) ->
@@ -739,7 +739,7 @@ json_body_obj(Httpd) ->
     end.
 
 maybe_decompress(Httpd, Body) ->
-    MaxSize = chttpd_util:get_chttpd_config_integer("max_http_request_size", 4294967296),
+    MaxSize = chttpd_util:get_chttpd_config_integer("max_http_request_size", 2147483647),
     maybe_decompress(Httpd, Body, MaxSize).
 
 maybe_decompress(Httpd, Body, MaxSize) ->
