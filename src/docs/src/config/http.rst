@@ -211,6 +211,8 @@ HTTP Server Options
 
         .. versionchanged:: 3.2 moved from [httpd] to [chttpd] section
 
+        .. versionchanged:: 3.5.4 default lowered from 4GB to 2GB
+
         Limit the maximum size of the HTTP request body. This setting applies
         to all requests and it doesn't discriminate between single vs.
         multi-document operations. So setting it to 1MB would block a
@@ -221,7 +223,7 @@ HTTP Server Options
         large HTTP requests rather than for limiting maximum document sizes. ::
 
             [chttpd]
-            max_http_request_size = 4294967296 ; 4 GB
+            max_http_request_size = 2147483647
 
         .. warning::
            Before version 2.1.0 :config:option:`couchdb/max_document_size` was

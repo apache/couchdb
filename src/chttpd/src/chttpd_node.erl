@@ -188,7 +188,7 @@ handle_node_req(#httpd{
     NewPath0 = "/" ++ lists:join("/", [couch_util:url_encode(P) || P <- PathParts]),
     NewRawPath = mochiweb_util:urlunsplit_path({NewPath0, Query, Fragment}),
     MaxSize = chttpd_util:get_chttpd_config_integer(
-        "max_http_request_size", 4294967296
+        "max_http_request_size", 2147483647
     ),
     NewOpts = [{body, MochiReq0:recv_body(MaxSize)} | MochiReq0:get(opts)],
     Ref = make_ref(),
