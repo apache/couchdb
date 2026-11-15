@@ -40,8 +40,7 @@
     enabled,
     url,
     gun_pid,
-    gun_mref,
-    openapi
+    gun_mref
 }).
 
 -define(NOUVEAU_SERVER_FLAVOUR, nouveau_server_flavour).
@@ -53,7 +52,21 @@ request(Method, Path, Headers, Body) ->
     gen_server:call(?MODULE, {request, Method, Path, Headers, Body, #{reply_to => self()}}).
 
 server_flavour() ->
-    persistent_term:get(?NOUVEAU_SERVER_FLAVOUR, query).
+    case persistent_term:get(?NOUVEAU_SERVER_FLAVOUR, undefined) of
+        undefined ->
+            case nouveau_api:openapi() of
+                {ok, OpenAPI} ->
+                    ServerFlavour = server_flavour(OpenAPI),
+                    persistent_term:put(?NOUVEAU_SERVER_FLAVOUR, ServerFlavour),
+                    ServerFlavour;
+                {error, _Reason} ->
+                    %% return the current setting, if we're wrong the next request will fail
+                    %% anyway.
+                    query
+            end;
+        ServerFlavour ->
+            ServerFlavour
+    end.
 
 init(_) ->
     ok = config:listen_for_changes(?MODULE, nil),
@@ -87,15 +100,6 @@ handle_info(restart_config_listener, State) ->
 handle_info(reconfigure, State) ->
     reconfigure(new_state(), State);
 handle_info({gun_up, GunPid, http2}, #state{gun_pid = GunPid} = State) ->
-    Self = self(),
-    spawn_link(fun() ->
-        case sync_request(GunPid, State#state.gun_mref, ~"GET", ~"/openapi.json", [], ~"") of
-            {ok, {200, _RespHeaders, RespBody}} ->
-                Self ! {openapi_ok, jiffy:decode(RespBody, [return_maps])};
-            {error, Reason} ->
-                Self ! {openapi_error, Reason}
-        end
-    end),
     {noreply, State};
 handle_info({gun_down, GunPid, http2, Reason, KilledStreams}, #state{gun_pid = GunPid} = State) ->
     couch_log:warning("Nouveau down for reason ~p (killed streams: ~p)", [Reason, KilledStreams]),
@@ -104,12 +108,8 @@ handle_info(
     {'DOWN', GunMRef, process, GunPid, Reason}, #state{gun_pid = GunPid, gun_mref = GunMRef} = State
 ) ->
     couch_log:warning("Nouveau down for reason ~p", [Reason]),
+    persistent_term:erase(?NOUVEAU_SERVER_FLAVOUR),
     {noreply, State#state{gun_pid = undefined, gun_mref = undefined}};
-handle_info({openapi_ok, OpenAPI}, State) ->
-    set_server_flavour(OpenAPI),
-    {noreply, State#state{openapi = OpenAPI}};
-handle_info({openapi_error, Reason}, State) ->
-    {stop, {error, Reason}, State};
 handle_info(Msg, State) ->
     couch_log:warning("~p received unexpected message: ~p", [?MODULE, Msg]),
     {noreply, State}.
@@ -229,25 +229,6 @@ verify(false) ->
     verify_none;
 verify(true) ->
     verify_peer.
-
-sync_request(GunPid, GunMRef, Method, Path, ReqHeaders, ReqBody) ->
-    StreamRef = gun:request(GunPid, Method, Path, ReqHeaders, ReqBody),
-    case gun:await(GunPid, StreamRef, GunMRef) of
-        {response, fin, Status, RespHeaders} ->
-            {ok, {Status, RespHeaders}};
-        {response, nofin, Status, RespHeaders} ->
-            case gun:await_body(GunPid, StreamRef, GunMRef) of
-                {ok, RespBody} ->
-                    {ok, {Status, RespHeaders, RespBody}};
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        {error, Reason} ->
-            {error, Reason}
-    end.
-
-set_server_flavour(OpenAPI) ->
-    persistent_term:put(?NOUVEAU_SERVER_FLAVOUR, server_flavour(OpenAPI)).
 
 %% Nouveau switched to query parameter for passing the index name to avoid
 %% ambiguous URI restrictions in new version of Jetty.

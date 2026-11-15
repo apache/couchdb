@@ -27,6 +27,7 @@
     set_purge_seq/3,
     set_update_seq/3,
     supported_lucene_versions/0,
+    openapi/0,
     jaxrs_error/2
 ]).
 
@@ -226,6 +227,17 @@ supported_lucene_versions() ->
         {ok, 200, _, RespBody} ->
             Json = jiffy:decode(RespBody, [return_maps]),
             {ok, maps:get(<<"supported_lucene_versions">>, Json, [])};
+        {ok, StatusCode, _, RespBody} ->
+            {error, jaxrs_error(StatusCode, RespBody)};
+        {error, Reason} ->
+            send_error(Reason)
+    end.
+
+openapi() ->
+    Resp = send_if_enabled(~"/openapi.json", [], ~"GET"),
+    case Resp of
+        {ok, 200, _, RespBody} ->
+            {ok, jiffy:decode(RespBody, [return_maps])};
         {ok, StatusCode, _, RespBody} ->
             {error, jaxrs_error(StatusCode, RespBody)};
         {error, Reason} ->
