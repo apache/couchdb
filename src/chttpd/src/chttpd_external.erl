@@ -80,7 +80,7 @@ json_req_obj_field(<<"headers">>, #httpd{mochi_req = Req}, _Db, _DocId) ->
     to_json_terms(Hlist);
 json_req_obj_field(<<"body">>, #httpd{req_body = undefined, mochi_req = Req}, _Db, _DocId) ->
     MaxSize = chttpd_util:get_chttpd_config_integer(
-        "max_http_request_size", 4294967296
+        "max_http_request_size", 2147483647
     ),
     try
         Req:recv_body(MaxSize)

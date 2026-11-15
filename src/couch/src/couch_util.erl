@@ -849,7 +849,7 @@ ext_term_size(_NotBinary) ->
     0.
 
 gunzip_with_limit(Data) ->
-    Limit = chttpd_util:get_chttpd_config_integer("max_http_request_size", 4294967296),
+    Limit = chttpd_util:get_chttpd_config_integer("max_http_request_size", 2147483647),
     gunzip_with_limit(Data, Limit).
 
 gunzip_with_limit(Data, Limit) when is_integer(Limit), Limit >= 0 ->
