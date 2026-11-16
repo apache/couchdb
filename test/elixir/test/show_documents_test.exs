@@ -277,7 +277,8 @@ defmodule ShowDocumentsTest do
       )
 
     assert String.match?(resp.headers["content-type"], ~r/text\/html/)
-    assert resp.headers["vary"] == "Accept"
+    vary = resp.headers["vary"] |> String.split(",") |> Enum.map(&String.trim/1)
+    assert "Accept" in vary
 
     etag = resp.headers["etag"]
 

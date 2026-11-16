@@ -103,11 +103,12 @@ defmodule Couch.Http do
          {:ok, status, resp_headers, resp_body} <-
            do_sync_request(origin, method, path, headers, body, options, 1) do
       resp_headers = headers_map(resp_headers)
+      decompressed_body = decompress_body(resp_headers, resp_body)
 
       %Couch.Response{
         status_code: status,
         headers: resp_headers,
-        body: process_body(body_mode, resp_headers, resp_body)
+        body: process_body(body_mode, resp_headers, decompressed_body)
       }
     else
       {:error, reason} -> %Couch.ErrorResponse{message: error_message(reason)}
@@ -220,17 +221,35 @@ defmodule Couch.Http do
         relay_loop(state)
 
       {:gun_response, ^conn, ^stream, fin, status, headers} ->
+        headers_map = headers_map(headers)
+
+        zstream =
+          if gzip_encoding?(headers_map) do
+            z = :zlib.open()
+            :ok = :zlib.inflateInit(z, 31)
+            z
+          else
+            nil
+          end
+
         async_headers = %Couch.AsyncHeaders{
           id: self(),
           status_code: status,
-          headers: headers_map(headers)
+          headers: headers_map
         }
 
         send(target, async_headers)
-        if fin == :fin, do: relay_done(state), else: relay_loop(state)
+        state1 = Map.put(state, :zstream, zstream)
+        if fin == :fin, do: relay_done(state1), else: relay_loop(state1)
 
       {:gun_data, ^conn, ^stream, fin, data} ->
-        send(target, %Couch.AsyncChunk{id: self(), chunk: data})
+        chunk =
+          case state[:zstream] do
+            nil -> data
+            z -> IO.iodata_to_binary(:zlib.inflate(z, data))
+          end
+
+        send(target, %Couch.AsyncChunk{id: self(), chunk: chunk})
         if fin == :fin, do: relay_done(state), else: relay_loop(state)
 
       {:gun_trailers, ^conn, ^stream, _trailers} ->
@@ -247,11 +266,12 @@ defmodule Couch.Http do
         cond do
           mref == state.cref ->
             # connection died
-            send(target, %Couch.AsyncEnd{id: self()})
+            relay_done(state)
             :ok
 
           mref == state.tref ->
             # target (test) process died, clean up
+            close_zstream(state)
             close_conn(conn)
             :ok
 
@@ -262,8 +282,14 @@ defmodule Couch.Http do
   end
 
   defp relay_done(state) do
+    close_zstream(state)
     send(state.target, %Couch.AsyncEnd{id: self()})
     close_conn(state.conn)
+    :ok
+  end
+
+  defp close_zstream(state) do
+    if z = state[:zstream], do: :zlib.close(z)
     :ok
   end
 
@@ -373,6 +399,15 @@ defmodule Couch.Http do
       |> put_new_header("user-agent", "couch-potion")
       |> put_new_header("content-type", "application/json")
 
+    gzip_enabled = System.get_env("EX_ACCEPT_GZIP") == "true"
+
+    headers =
+      if gzip_enabled or Keyword.get(options, :gzip, false) do
+        put_new_header(headers, "accept-encoding", "gzip")
+      else
+        headers
+      end
+
     case Keyword.get(options, :cookie) do
       nil -> set_auth(headers, options)
       cookie -> put_new_header(headers, "cookie", cookie)
@@ -404,6 +439,22 @@ defmodule Couch.Http do
   end
 
   # Response stuff
+
+  defp gzip_encoding?(headers) do
+    case Map.get(headers, "content-encoding") do
+      "gzip" -> true
+      encs when is_list(encs) -> "gzip" in encs
+      _ -> false
+    end
+  end
+
+  defp decompress_body(headers, body) do
+    if gzip_encoding?(headers) and is_binary(body) and byte_size(body) > 0 do
+      :zlib.gunzip(body)
+    else
+      body
+    end
+  end
 
   defp process_body(:raw, _headers, body), do: body
 

@@ -256,6 +256,19 @@ elixir: elixir-init devclean
 		--erlang-config rel/files/eunit.config \
 		--no-eval 'mix test --max-failures 1 --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 
+.PHONY: elixir-compression
+# target: elixir-compression - Run Elixir-based integration tests with response compression enabled
+elixir-compression: export MIX_ENV=integration
+elixir-compression: export EX_ACCEPT_GZIP=true
+elixir-compression: elixir-init devclean
+	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass \
+		--enable-erlang-views \
+		--no-join \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--locald-config test/elixir/test/config/compression.ini \
+		--erlang-config rel/files/eunit.config \
+		--no-eval 'mix test --max-failures 1 --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
+
 ifneq ($(CLOUSEAU_DIR),)
 _WITH_CLOUSEAU="--with-clouseau --clouseau-dir=$(CLOUSEAU_DIR)"
 else ifeq ($(with_clouseau), true)
