@@ -19,6 +19,8 @@
 
 #define DEFAULT_STACK_SIZE (64L * 1024L * 1024L)
 #define BUF_SIZE 1024
+// Longest line which still fits in a JS string
+#define MAX_LINE_LEN ((1 << 30) - 1)
 
 #define USAGE "couchjs [-V|-M memorylimit|-h] <script.js>\n"
 
@@ -294,8 +296,11 @@ static JSValue js_readline(JSContext* cx, JSValueConst this_val, int argc, JSVal
     if(!line) {
       BAIL("Could not allocate line buffer for list sub-command");
     }
-    int len;
+    ssize_t len;
     if ((len = linein(&line, &linemax)) != -1) {
+      if (len > MAX_LINE_LEN) {
+        BAIL("list linein() line too long");
+      }
       if (line[len - 1] != '\n') {
         BAIL("list linein() didn't end in newline");
       }
@@ -473,9 +478,12 @@ int main(int argc, const char* argv[])
       BAIL("Could not allocate line buffer");
     }
 
-    int len;
+    ssize_t len;
     bool do_continue = true;
     while (do_continue && (len = linein(&line, &linemax)) != -1) {
+      if (len > MAX_LINE_LEN) {
+        BAIL("linein() line too long");
+      }
       if (line[len - 1] != '\n') {
         BAIL("linein() didn't end in newline");
       }
