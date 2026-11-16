@@ -163,6 +163,7 @@ check: all
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
+	@$(MAKE) elixir-compression
 	@$(MAKE) elixir-search
 	@$(MAKE) weatherreport-test
 	@$(MAKE) nouveau-test
