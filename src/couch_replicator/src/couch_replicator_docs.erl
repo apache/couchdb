@@ -31,6 +31,7 @@
 % to delete it. At some point in the future, remove this logic altogether.
 -define(REP_DESIGN_DOC, <<"_design/_replicator">>).
 -define(OWNER, <<"owner">>).
+-define(OWNER_ERR, ~"Can't update replication documents from other users.").
 % Use an atom as the replicator application role. Users cannot create atom
 % roles, only binaries. This way we ensure nobody can pretend to be the
 % replicator app.
@@ -231,9 +232,12 @@ before_doc_update(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db, _Updat
     Doc;
 before_doc_update(#doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} = Doc, _Db, _UpdateType) ->
     Doc;
-before_doc_update(#doc{} = Doc, _Db, ?REPLICATED_CHANGES) ->
-    % Skip internal replicator updates
-    Doc;
+before_doc_update(#doc{} = Doc, Db, ?REPLICATED_CHANGES) ->
+    % internal replicator and admin skips owner check
+    case couch_db:is_admin(Db) of
+        true -> Doc;
+        false -> before_doc_update(Doc, Db, ?INTERACTIVE_EDIT)
+    end;
 before_doc_update(#doc{body = {Body}} = Doc, Db, _UpdateType) ->
     #user_ctx{roles = Roles, name = Name} = couch_db:get_user_ctx(Db),
     IsReplicator = lists:member(?REPLICATOR_ROLE, Roles),
@@ -256,9 +260,11 @@ before_doc_update(#doc{body = {Body}} = Doc, Db, _UpdateType) ->
     end,
     Doc1.
 
-before_doc_update_owner(undefined, Name, _Db, #doc{body = {Body}} = Doc) ->
+before_doc_update_owner(undefined, Name, Db, #doc{body = {Body}} = Doc) ->
+    ok = check_stored_owner(Name, Db, Doc),
     Doc#doc{body = {?replace(Body, ?OWNER, Name)}};
-before_doc_update_owner(Name, Name, _Db, #doc{} = Doc) ->
+before_doc_update_owner(Name, Name, Db, #doc{} = Doc) ->
+    ok = check_stored_owner(Name, Db, Doc),
     Doc;
 before_doc_update_owner(Other, Name, Db, #doc{body = {Body}} = Doc) ->
     case (catch couch_db:check_is_admin(Db)) of
@@ -267,9 +273,25 @@ before_doc_update_owner(Other, Name, Db, #doc{body = {Body}} = Doc) ->
         ok ->
             Doc;
         _ ->
-            Err = <<"Can't update replication documents from other users.">>,
-            throw({forbidden, Err})
+            throw({forbidden, ?OWNER_ERR})
     end.
+
+check_stored_owner(Name, Db, #doc{id = DocId}) ->
+    case couch_db:is_clustered(Db) orelse couch_db:is_admin(Db) of
+        true ->
+            ok;
+        false ->
+            {ok, Leafs} = couch_db:open_doc_revs(Db, DocId, all, []),
+            case lists:all(fun(Leaf) -> is_leaf_owner(Name, Leaf) end, Leafs) of
+                true -> ok;
+                false -> throw({forbidden, ?OWNER_ERR})
+            end
+    end.
+
+is_leaf_owner(Name, {ok, #doc{deleted = false, body = {Body}}}) ->
+    get_value(?OWNER, Body) =:= Name;
+is_leaf_owner(_Name, _DeletedOrMissing) ->
+    true.
 
 -spec after_doc_read(#doc{}, Db :: any()) -> #doc{}.
 after_doc_read(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db) ->
@@ -767,6 +789,113 @@ t_after_doc_read_not_matching_owner_proxies(DbName) ->
     % Owner still sees everything
     OwnerCtx = {user_ctx, #user_ctx{name = ~"o1", roles = []}},
     ?assertEqual(Map, read_doc(DbName, DocId, OwnerCtx)).
+
+-define(NOPE, {forbidden, ?OWNER_ERR}).
+
+replicator_owner_test_() ->
+    {
+        setup,
+        fun test_util:start_couch/0,
+        fun test_util:stop_couch/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                ?TDEF_FE(t_owner_can_update),
+                ?TDEF_FE(t_others_cannot_update),
+                ?TDEF_FE(t_others_cannot_delete),
+                ?TDEF_FE(t_admin_can_update),
+                ?TDEF_FE(t_owners_in_conflicts)
+            ]
+        }
+    }.
+
+t_owner_can_update(DbName) ->
+    {ok, Rev1} = update(DbName, ~"o1", rep_doc({0, []}, [])),
+    {ok, Rev2} = update(DbName, ~"o1", rep_doc(Rev1, [])),
+    ?assertEqual({ok, []}, update_repl(DbName, ~"o1", rep_doc(child(Rev2), [{?OWNER, ~"o1"}]))),
+    ?assertEqual({ok, []}, update_repl(DbName, ~"o1", rep_doc({9, [~"x"]}, [{?OWNER, ~"o1"}]))),
+    ?assertEqual([{3, ~"o1"}, {9, ~"o1"}], leafs(DbName)).
+
+t_others_cannot_update(DbName) ->
+    {ok, Rev} = update(DbName, ~"o1", rep_doc({0, []}, [])),
+    ?assertEqual(?NOPE, update(DbName, ~"o2", rep_doc(Rev, []))),
+    ?assertEqual(?NOPE, update(DbName, ~"o2", rep_doc(Rev, [{?OWNER, ~"o2"}]))),
+    ?assertEqual(?NOPE, update_repl(DbName, ~"o2", rep_doc(child(Rev), [{?OWNER, ~"o2"}]))),
+    ?assertEqual([{1, ~"o1"}], leafs(DbName)).
+
+t_others_cannot_delete(DbName) ->
+    {ok, Rev} = update(DbName, ~"o1", rep_doc({0, []}, [])),
+    ?assertEqual(?NOPE, update(DbName, ~"o2", deleted(Rev))),
+    ?assertEqual(?NOPE, update_repl(DbName, ~"o2", deleted(child(Rev)))),
+    ?assertEqual([{1, ~"o1"}], leafs(DbName)).
+
+t_admin_can_update(DbName) ->
+    {ok, Rev} = update(DbName, ~"o1", rep_doc({0, []}, [])),
+    AdminCtx = #user_ctx{name = ~"adm", roles = [~"_admin"]},
+    ?assertMatch({ok, _}, update(DbName, AdminCtx, rep_doc(Rev, [{?OWNER, ~"o1"}]))),
+    Doc = rep_doc({9, [~"x"]}, [{?OWNER, ~"o2"}]),
+    ?assertEqual({ok, []}, update_repl(DbName, ?ADMIN_USER, Doc)),
+    ?assertEqual([{2, ~"o1"}, {9, ~"o2"}], leafs(DbName)).
+
+t_owners_in_conflicts(DbName) ->
+    Doc1 = rep_doc({1, [~"a"]}, [{?OWNER, ~"o1"}]),
+    Doc2 = rep_doc({1, [~"b"]}, [{?OWNER, ~"o2"}]),
+    {ok, []} = update_repl(DbName, ?ADMIN_USER, Doc1),
+    {ok, []} = update_repl(DbName, ?ADMIN_USER, Doc2),
+    ?assertEqual(?NOPE, update(DbName, ~"o1", rep_doc({1, [~"a"]}, []))),
+    ?assertEqual(?NOPE, update(DbName, ~"o2", rep_doc({1, [~"b"]}, []))),
+    ?assertEqual([{1, ~"o1"}, {1, ~"o2"}], leafs(DbName)).
+
+rep_doc(Revs, Props) ->
+    Endpoints = [
+        {~"source", ~"http://localhost:5984/src"},
+        {~"target", ~"http://localhost:5984/tgt"}
+    ],
+    #doc{id = ~"rep1", revs = revs(Revs), body = {Props ++ Endpoints}}.
+
+deleted(Revs) ->
+    #doc{id = ~"rep1", revs = revs(Revs), deleted = true, body = {[]}}.
+
+revs({Pos, RevId}) when is_binary(RevId) ->
+    {Pos, [RevId]};
+revs({_, Revs} = Path) when is_list(Revs) ->
+    Path.
+
+child({Pos, RevId}) ->
+    {Pos + 1, [~"child", RevId]}.
+
+update(DbName, Name, Doc) when is_binary(Name) ->
+    update(DbName, #user_ctx{name = Name}, Doc);
+update(DbName, #user_ctx{} = Ctx, Doc) ->
+    with_user_db(DbName, Ctx, fun(Db) -> couch_db:update_doc(Db, Doc, []) end).
+
+update_repl(DbName, Name, Doc) when is_binary(Name) ->
+    update_repl(DbName, #user_ctx{name = Name}, Doc);
+update_repl(DbName, #user_ctx{} = Ctx, Doc) ->
+    with_user_db(DbName, Ctx, fun(Db) ->
+        couch_db:update_docs(Db, [Doc], [], ?REPLICATED_CHANGES)
+    end).
+
+with_user_db(DbName, Ctx, Fun) ->
+    {ok, Db} = couch_db:open(DbName, [{user_ctx, Ctx}]),
+    try
+        Fun(Db)
+    catch
+        throw:{forbidden, _} = Error -> Error
+    after
+        couch_db:close(Db)
+    end.
+
+leafs(DbName) ->
+    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
+    {ok, Leafs} = couch_db:open_doc_revs(Db, ~"rep1", all, []),
+    couch_db:close(Db),
+    lists:sort([
+        {Pos, get_value(?OWNER, Props)}
+     || {ok, #doc{revs = {Pos, _}, deleted = false, body = {Props}}} <- Leafs
+    ]).
 
 ejson_from_map(#{} = Map) ->
     ?JSON_DECODE(?JSON_ENCODE(Map)).
