@@ -35,7 +35,9 @@
     "facet ranges, non-empty",
     "group search",
     "index info matches search info",
-    "timeouts do not expose internal state"
+    "timeouts do not expose internal state",
+    "clear error raised when indexing multiple data types in same field (string then number)",
+    "clear error raised when indexing multiple data types in same field (number then string)"
   ],
   "BasicTextTest": [
     "explain options",

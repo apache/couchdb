@@ -257,6 +257,7 @@ user = $CouchDBUser
 js_engine = $JSEngine
 spidermonkey_version = $SpiderMonkeyVersion
 with_spidermonkey = $WithSpiderMonkey
+clouseau_version = $ClouseauVersion
 "@
 $InstallMk | Out-File "$rootdir\install.mk" -encoding ascii
 
