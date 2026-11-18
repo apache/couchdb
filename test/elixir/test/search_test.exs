@@ -333,4 +333,49 @@ defmodule SearchTest do
       } = resp
     end)
   end
+
+  @tag :clouseau_4
+  test "clear error raised when indexing multiple data types in same field (string then number)", context do
+    db_name = random_db_name()
+    {:ok, _} = create_db(db_name, query: %{q: 1})
+    on_exit(fn -> delete_db(db_name) end)
+
+    resp = Couch.post("/#{db_name}/_bulk_docs",
+      headers: ["Content-Type": "application/json"],
+      body: %{:docs => [
+        %{"item" => "bar", "place" => "kitchen", "state" => "new", "price" => 0.99},
+        %{"item" => 12,    "place" => "kitchen", "state" => "new", "price" => 0.99},
+      ]}
+    )
+    assert resp.status_code in [201, 202]
+
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/inventory/_search/fruits?q=*:*"
+    resp = Couch.get(url)
+    assert_on_status(resp, 400, "Inconsistent data types used for the following fields: item.")
+  end
+
+  @tag :clouseau_4
+  test "clear error raised when indexing multiple data types in same field (number then string)", context do
+    db_name = random_db_name()
+    {:ok, _} = create_db(db_name, query: %{q: 1})
+    on_exit(fn -> delete_db(db_name) end)
+
+    resp = Couch.post("/#{db_name}/_bulk_docs",
+      headers: ["Content-Type": "application/json"],
+      body: %{:docs => [
+        %{"item" => 12,    "place" => "kitchen", "state" => "new", "price" => 0.99},
+        %{"item" => "bar", "place" => "kitchen", "state" => "new", "price" => 0.99},
+      ]}
+    )
+    assert resp.status_code in [201, 202]
+
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/inventory/_search/fruits?q=*:*"
+    resp = Couch.get(url)
+    assert_on_status(resp, 400, "Inconsistent data types used for the following fields: item.")
+  end
+
 end

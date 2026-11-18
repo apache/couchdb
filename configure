@@ -424,6 +424,7 @@ user = $COUCHDB_USER
 js_engine = $JS_ENGINE
 spidermonkey_version = $SM_VSN
 with_spidermonkey = $WITH_SPIDERMONKEY
+clouseau_version = $CLOUSEAU_VSN
 EOF
 
 cat > $rootdir/config.erl << EOF
