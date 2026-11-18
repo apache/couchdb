@@ -252,6 +252,13 @@ else ifeq ($(with_clouseau), true)
 _WITH_CLOUSEAU="--with-clouseau"
 endif
 
+# Some tests are for bug fixes or features only present in Clouseau 4 or higher.
+ifneq ($(filter 3.%,$(clouseau_version)),)
+_CLOUSEAU_4_ONLY=--exclude clouseau_4
+else
+_CLOUSEAU_4_ONLY=
+endif
+
 .PHONY: elixir-search
 # target: elixir-search - Run search tests, requires a configured Clouseau instance
 elixir-search: export MIX_ENV=integration
@@ -261,7 +268,7 @@ ifneq ($(_WITH_CLOUSEAU), )
 		"$(_WITH_CLOUSEAU)" \
 		"$(TEST_OPTS)" \
 		--locald-config test/config/test-config.ini \
-		--no-eval 'mix test --trace --include test/elixir/test/config/search.elixir'
+		--no-eval 'mix test --trace --include test/elixir/test/config/search.elixir $(_CLOUSEAU_4_ONLY) $(EXUNIT_OPTS)'
 else
 	@echo "Warning: Clouseau is not enabled, `elixir-search` cannot be run."
 endif
