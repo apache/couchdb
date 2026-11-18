@@ -96,67 +96,73 @@ You can run CouchDB with `--enable-tls` mode, which will automatically generate
 vm.args, certificates, and configuration files.
 
 ```bash
-./configure --dev --spidermonkey-version 91 && make && ./dev/run -t
-./configure --dev --spidermonkey-version 91 && make && ./dev/run --enable-tls
+# Enable custom TLS distribution when starting CouchDB
+./configure --dev && make && ./dev/run --enable-tls
+# Or using the short flag `-t`
+./configure --dev && make && ./dev/run -t
 
-./dev/remsh-tls
-(node1@127.0.0.1)1> net_kernel:nodes_info().
-{ok,[{'node3@127.0.0.1',
-         [{owner,<0.679.0>},
-          {state,up},
-          {address,
-              {net_address,{{127,0,0,1},55013},"127.0.0.1",tls,inet}},
-          {type,normal},
-          {in,150},
-          {out,147}]},
-     {'node2@127.0.0.1',
-         [{owner,<0.655.0>},
-          {state,up},
-          {address,
-              {net_address,{{127,0,0,1},55011},"127.0.0.1",tls,inet}},
-          {type,normal},
-          {in,181},
-          {out,196}]},
-     {'remsh14066@127.0.0.1',
-         [{owner,<0.8558.0>},
-          {state,up},
-          {address,
-              {net_address,{{127,0,0,1},55075},"127.0.0.1",tls,inet}},
-          {type,hidden},
-          {in,10},
-          {out,15}]}]}
-```
-
-You can also set specific nodes to use TCP:
-
-```bash
-./configure --dev --spidermonkey-version 91 && make && ./dev/run -t --no-tls node2@127.0.0.1
-./configure --dev --spidermonkey-version 91 && make && ./dev/run -t --no-tls node2,node3
-
+# Verify in another terminal
 ./dev/remsh-tls
 (node1@127.0.0.1)1> net_kernel:nodes_info().
 {ok,[{'node2@127.0.0.1',
-         [{owner,<0.456.0>},
+         [{owner,<0.420.0>},
           {state,up},
           {address,
-              {net_address,{{127,0,0,1},55170},"127.0.0.1",tcp,inet}},
+              {net_address,{{127,0,0,1},51814},"127.0.0.1",tls,inet}},
           {type,normal},
-          {in,145},
-          {out,164}]},
+          {in,39},
+          {out,38}]},
      {'node3@127.0.0.1',
-         [{owner,<0.461.0>},
+         [{owner,<0.422.0>},
           {state,up},
           {address,
-              {net_address,{{127,0,0,1},55172},"127.0.0.1",tcp,inet}},
+              {net_address,{{127,0,0,1},51813},"127.0.0.1",tls,inet}},
           {type,normal},
-          {in,141},
-          {out,169}]},
-     {'remsh17312@127.0.0.1',
-         [{owner,<0.1418.0>},
+          {in,40},
+          {out,39}]},
+     {'remsh90016@127.0.0.1',
+         [{owner,<0.778.0>},
           {state,up},
           {address,
-              {net_address,{{127,0,0,1},55203},"127.0.0.1",tls,inet}},
+              {net_address,{{127,0,0,1},51837},"127.0.0.1",tls,inet}},
           {type,hidden},
-          {in,10},
-          {out,15}]}]}
+          {in,13},
+          {out,18}]}]}
+```
+
+You can also set specific nodes to use TCP only:
+
+```bash
+# Specify node2@127.0.0.1 to use TCP only
+./configure --dev && make && ./dev/run -t --no-tls node2@127.0.0.1
+# Or use short node names
+./configure --dev && make && ./dev/run -t --no-tls node2,node3
+
+# Verify in another terminal
+./dev/remsh-tls
+(node1@127.0.0.1)1> net_kernel:nodes_info().
+{ok,[{'node2@127.0.0.1',
+         [{owner,<0.402.0>},
+          {state,up},
+          {address,
+              {net_address,{{127,0,0,1},51750},"127.0.0.1",tcp,inet}},
+          {type,normal},
+          {in,55},
+          {out,50}]},
+     {'node3@127.0.0.1',
+         [{owner,<0.408.0>},
+          {state,up},
+          {address,
+              {net_address,{{127,0,0,1},51751},"127.0.0.1",tcp,inet}},
+          {type,normal},
+          {in,67},
+          {out,49}]},
+     {'remsh88631@127.0.0.1',
+         [{owner,<0.794.0>},
+          {state,up},
+          {address,
+              {net_address,{{127,0,0,1},51779},"127.0.0.1",tls,inet}},
+          {type,hidden},
+          {in,29},
+          {out,50}]}]}
 ```
