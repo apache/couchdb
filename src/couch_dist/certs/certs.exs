@@ -2,7 +2,7 @@
 # credo:disable-for-this-file
 # Important: run this with the wrapper script, so that umask is set correctly.
 
-Mix.install([{:x509, "~> 0.8.3"}, {:optimus, "~> 0.2"}])
+Mix.install([{:x509, "~> 0.9.2"}, {:optimus, "~> 0.6.1"}])
 
 defmodule Certs do
   def main(argv) do
@@ -70,6 +70,12 @@ defmodule Certs do
       X509.RDNSequence.new(subject)
       |> X509.RDNSequence.get_attr(:commonName)
 
+    ipAddress =
+      case :inet.parse_address(to_charlist(commonName)) do
+        {:ok, ip} -> [{:iPAddress, ip |> Tuple.to_list() |> :erlang.list_to_binary()}]
+        _ -> []
+      end
+
     import X509.Certificate.Extension
 
     %X509.Certificate.Template{
@@ -82,7 +88,7 @@ defmodule Certs do
         ext_key_usage: ext_key_usage([:serverAuth, :clientAuth]),
         subject_key_identifier: true,
         authority_key_identifier: true,
-        subject_alt_name: subject_alt_name([commonName])
+        subject_alt_name: subject_alt_name([commonName | ipAddress])
       ]
     }
   end
