@@ -35,6 +35,8 @@
 -include("mango.hrl").
 -include("mango_idx_view.hrl").
 
+-define(PREFIX_RE, "^\\w+").
+
 validate_new(#idx{} = Idx, _Db) ->
     {ok, Def} = do_validate(Idx#idx.def),
     {ok, Idx#idx{def = Def}}.
@@ -315,6 +317,8 @@ indexable({[{<<"$beginsWith">>, _}]}) ->
 % Making `$exists` indexable should not cause problems in other cases.
 indexable({[{<<"$exists">>, _}]}) ->
     true;
+indexable({[{<<"$regex">>, _}]}) ->
+    true;
 % All other operators are currently not indexable.
 % This is also a subtle assertion that we don't
 % call indexable/1 on a field name.
@@ -495,6 +499,14 @@ range({[{<<"$gt">>, Arg}]}, LCmp, Low, HCmp, High) ->
             empty;
         max ->
             empty
+    end;
+% use any text prefix in the regex to narrow the query
+range({[{<<"$regex">>, Arg}]}, LCmp, Low, HCmp, High) ->
+    case re:run(Arg, ?PREFIX_RE, [{capture, first, binary}]) of
+        {match, [Prefix]} ->
+            {'$gte', Prefix, '$lte', <<Prefix/binary, 16#10FFFF>>};
+        nomatch ->
+            {LCmp, Low, HCmp, High}
     end;
 % There's some other un-indexable restriction on the index
 % that will be applied as a post-filter. Ignore it and
