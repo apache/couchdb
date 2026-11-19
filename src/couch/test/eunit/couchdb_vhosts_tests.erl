@@ -19,6 +19,7 @@
 -define(iofmt(S, A), lists:flatten(io_lib:format(S, A))).
 
 setup() ->
+    ok = config:set("couch_httpd", "enable_rewrites", "true"),
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     Doc = couch_doc:from_json_obj(
@@ -58,6 +59,7 @@ setup() ->
 
 teardown({_, DbName}) ->
     ok = couch_server:delete(?l2b(DbName), []),
+    ok = config:delete("couch_httpd", "enable_rewrites"),
     ok.
 
 vhosts_test_() ->

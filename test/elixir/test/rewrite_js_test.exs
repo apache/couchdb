@@ -215,6 +215,7 @@ defmodule RewriteJSTest do
       @tag with_random_db: db_name
       test "Test basic js rewrites on #{db_name}", context do
         db_name = context[:db_name]
+        set_config({"chttpd", "enable_rewrites", "true"})
 
         create_doc(db_name, @ddoc)
 
@@ -317,6 +318,7 @@ defmodule RewriteJSTest do
       @tag with_random_db: db_name
       test "early response on #{db_name}", context do
         db_name = context[:db_name]
+        set_config({"chttpd", "enable_rewrites", "true"})
 
         ddoc = %{
           _id: "_design/response",
@@ -348,6 +350,7 @@ defmodule RewriteJSTest do
       @tag with_random_db: db_name
       test "path relative to server on #{db_name}", context do
         db_name = context[:db_name]
+        set_config({"chttpd", "enable_rewrites", "true"})
 
         ddoc = %{
           _id: "_design/relative",
@@ -367,6 +370,7 @@ defmodule RewriteJSTest do
       @tag with_random_db: db_name
       test "loop on #{db_name}", context do
         db_name = context[:db_name]
+        set_config({"chttpd", "enable_rewrites", "true"})
 
         ddoc_loop = %{
           _id: "_design/loop",
@@ -386,6 +390,7 @@ defmodule RewriteJSTest do
       test "requests with body preserve the query string rewrite on #{db_name}",
            context do
         db_name = context[:db_name]
+        set_config({"chttpd", "enable_rewrites", "true"})
 
         ddoc_qs = %{
           _id: "_design/qs",
@@ -405,6 +410,21 @@ defmodule RewriteJSTest do
         assert resp.status_code == 200
         assert length(resp.body["results"]) == 1
         assert Enum.at(resp.body["results"], 0)["id"] == "qs2"
+      end
+
+      @tag with_random_db: db_name
+      test "rewrite requests blocked by default on #{db_name}",
+           context do
+        db_name = context[:db_name]
+        create_doc(db_name, @ddoc)
+        resp = Couch.get("/#{db_name}/_design/test/_rewrite/foo")
+
+        assert resp.status_code == 403
+
+        assert resp.body == %{
+                 "error" => "forbidden",
+                 "reason" => "rewrite handlers are not enabled"
+               }
       end
     end
   )

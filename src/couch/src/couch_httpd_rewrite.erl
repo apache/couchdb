@@ -108,7 +108,15 @@
 %% "to": "/some/:foo",
 %%  }}
 
-handle_rewrite_req(
+handle_rewrite_req(#httpd{} = Req, Db, DDoc) ->
+    case config:get_boolean("couch_httpd", "enable_rewrites", false) of
+        true ->
+            handle_rewrite_req_int(Req, Db, DDoc);
+        false ->
+            throw({forbidden, ~"rewrite handlers are not enabled"})
+    end.
+
+handle_rewrite_req_int(
     #httpd{
         path_parts = [DbName, <<"_design">>, DesignName, _Rewrite | PathParts],
         method = Method,
