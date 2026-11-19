@@ -19,6 +19,7 @@ defmodule RewriteTest do
            ]
       test "Test basic rewrites on #{db_name}", context do
         db_name = context[:db_name]
+        set_config({"chttpd", "enable_rewrites", "true"})
 
         ddoc = ~S"""
         {
@@ -453,6 +454,7 @@ defmodule RewriteTest do
            ]
       test "path relative to server on #{db_name}", context do
         db_name = context[:db_name]
+        set_config({"chttpd", "enable_rewrites", "true"})
 
         ddoc = %{
           _id: "_design/test2",
@@ -477,6 +479,7 @@ defmodule RewriteTest do
            ]
       test "loop detection on #{db_name}", context do
         db_name = context[:db_name]
+        set_config({"chttpd", "enable_rewrites", "true"})
 
         ddoc_loop = %{
           _id: "_design/loop",
@@ -496,6 +499,7 @@ defmodule RewriteTest do
            ]
       test "serial execution is not spuriously counted as loop on #{db_name}", context do
         db_name = context[:db_name]
+        set_config({"chttpd", "enable_rewrites", "true"})
 
         ddoc = %{
           _id: "_design/test",

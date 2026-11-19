@@ -25,6 +25,14 @@
 -define(MATCH_ALL, {bind, <<"*">>}).
 
 handle_rewrite_req(#httpd{} = Req, Db, DDoc) ->
+    case config:get_boolean("chttpd", "enable_rewrites", false) of
+        true ->
+            handle_rewrite_req_int(Req, Db, DDoc);
+        false ->
+            throw({forbidden, ~"rewrite handlers are not enabled"})
+    end.
+
+handle_rewrite_req_int(#httpd{} = Req, Db, DDoc) ->
     RewritesSoFar = erlang:get(?REWRITE_COUNT),
     MaxRewrites = chttpd_util:get_chttpd_config_integer("rewrite_limit", 100),
     case RewritesSoFar >= MaxRewrites of
