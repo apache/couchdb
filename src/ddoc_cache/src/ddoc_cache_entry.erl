@@ -12,6 +12,7 @@
 
 -module(ddoc_cache_entry).
 -behaviour(gen_server).
+-include_lib("couch/include/couch_db.hrl").
 
 -export([
     dbname/1,
@@ -162,7 +163,7 @@ terminate(_Reason, St) ->
     % Blow away any current opener if it exists
     if
         not is_pid(Pid) -> ok;
-        true -> catch exit(Pid, kill)
+        true -> ?try_catch(fun exit/2, [Pid, kill])
     end,
     ok.
 
@@ -213,7 +214,7 @@ handle_cast(refresh, #st{opener = Ref} = St) when is_reference(Ref) ->
     },
     {noreply, NewSt};
 handle_cast(refresh, #st{opener = Pid} = St) when is_pid(Pid) ->
-    catch exit(Pid, kill),
+    ?try_catch(fun exit/2, [Pid, kill]),
     receive
         {'DOWN', _, _, Pid, _} -> ok
     end,

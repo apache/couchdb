@@ -11,6 +11,7 @@
 % the License.
 
 -module(couch_epi_dispatch).
+-include_lib("couch/include/couch_db.hrl").
 
 -export([
     dispatch/2
@@ -71,7 +72,7 @@ start_epi(Ctx0, Plugins) ->
 stop_epi(Ctx0, ServiceId, Plugins) ->
     ok = application:set_env(couch_epi, plugins, Plugins),
     Handle = couch_epi:get_handle(ServiceId),
-    catch couch_epi_module_keeper:reload(Handle),
+    ?try_catch(fun couch_epi_module_keeper:reload/1, [Handle]),
     Ctx1 = couch_tests:stop_applications([couch_epi], Ctx0),
     application:unload(couch_epi),
     Ctx1.

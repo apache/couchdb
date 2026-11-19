@@ -11,8 +11,8 @@
 % the License.
 
 -module(couch_epi_module_keeper).
-
 -behaviour(gen_server).
+-include("couch_epi.hrl").
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -56,7 +56,7 @@ start_link(Type, Key, Codegen) ->
     ).
 
 stop(Server) ->
-    catch gen_server:call(Server, stop).
+    ?try_catch(fun gen_server:call/2, [Server, stop]).
 
 reload(Server) ->
     gen_server:call(Server, reload).

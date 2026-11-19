@@ -12,6 +12,7 @@
 
 -module(smoosh_channel).
 -behaviour(gen_server).
+-include_lib("couch/include/couch_db.hrl").
 
 % public api.
 -export([start_link/1, close/1, suspend/1, resume/1, get_status/1]).
@@ -496,10 +497,10 @@ do_resume(#state{active = Active} = State) ->
     State#state{paused = false}.
 
 suspend_pid(Pid) when is_pid(Pid) ->
-    catch erlang:suspend_process(Pid, [unless_suspending]).
+    ?try_catch(fun erlang:suspend_process/2, [Pid, [unless_suspending]]).
 
 resume_pid(Pid) when is_pid(Pid) ->
-    catch erlang:resume_process(Pid).
+    ?try_catch(fun erlang:resume_process/1, [Pid]).
 
 -ifdef(TEST).
 

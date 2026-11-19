@@ -16,3 +16,16 @@
 
 % Copied from `couch_db.hrl` which cannot be included in this application
 -define(term_to_bin(T), term_to_binary(T, [{minor_version, 1}])).
+
+-define(try_catch(F, A), ?try_catch(erlang, apply, [F, A])).
+-define(try_catch(M, F, A),
+    (fun() ->
+        try
+            apply(M, F, A)
+        catch
+            throw:__Term -> __Term;
+            exit:__Reason -> {'EXIT', __Reason};
+            error:__Reason:__Stacktrace -> {'EXIT', {__Reason, __Stacktrace}}
+        end
+    end)()
+).

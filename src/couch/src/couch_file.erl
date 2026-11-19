@@ -690,7 +690,7 @@ fsync(Fd) ->
     Res.
 
 find_header(Fd, Block) ->
-    case (catch load_header(Fd, Block)) of
+    case ?try_catch(fun load_header/2, [Fd, Block]) of
         {ok, Bin} ->
             {ok, Bin};
         _Error ->
@@ -763,7 +763,7 @@ find_header(Fd, Block, ReadCount) ->
 find_newest_header(_Fd, []) ->
     not_found;
 find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
-    case (catch load_header(Fd, Location, Size)) of
+    case ?try_catch(fun load_header/3, [Fd, Location, Size]) of
         {ok, HeaderBin} ->
             {ok, Location, HeaderBin};
         _Error ->

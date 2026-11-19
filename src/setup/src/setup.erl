@@ -85,7 +85,7 @@ cluster_system_dbs() ->
 has_cluster_system_dbs([]) ->
     true;
 has_cluster_system_dbs([Db | Dbs]) ->
-    case catch fabric:get_db_info(Db) of
+    case ?try_catch(fun fabric:get_db_info/1, [Db]) of
         {ok, _} -> has_cluster_system_dbs(Dbs);
         _ -> false
     end.

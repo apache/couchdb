@@ -93,7 +93,7 @@ with_db(Fun) when is_function(Fun, 1) ->
             try
                 Fun(Db)
             after
-                catch couch_db:close(Db)
+                ?try_catch(fun couch_db:close/1, [Db])
             end;
         Else ->
             throw(Else)

@@ -124,7 +124,7 @@ init() ->
 
 clear() ->
     Tables = [?SHARES, ?PRIORITIES, ?USAGE, ?CHARGES, ?NUM_JOBS],
-    lists:foreach(fun(T) -> catch ets:delete(T) end, Tables).
+    lists:foreach(fun(T) -> ?try_catch(fun ets:delete/1, [T]) end, Tables).
 
 % This should be called when user updates the replicator.shares config section
 %

@@ -11,6 +11,7 @@
 % the License.
 
 -module(couch_epi_functions_gen).
+-include("couch_epi.hrl").
 
 -export([
     generate/2,
@@ -340,7 +341,7 @@ do_dispatch(
     #opts{concurrent = true, ignore_errors = true}
 ) ->
     spawn(fun() ->
-        (catch Handle:dispatch(Module, Function, Args))
+        ?try_catch(fun Handle:dispatch/3, [Module, Function, Args])
     end);
 do_dispatch(
     Handle,
@@ -349,7 +350,7 @@ do_dispatch(
     Args,
     #opts{ignore_errors = true}
 ) ->
-    (catch Handle:dispatch(Module, Function, Args));
+    ?try_catch(fun Handle:dispatch/3, [Module, Function, Args]);
 do_dispatch(
     Handle,
     Module,

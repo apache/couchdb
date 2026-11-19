@@ -557,7 +557,7 @@ busy(ProcessList, Threshold) when Threshold > 0 ->
 busy(ProcessList, Threshold, Property) when Threshold > 0 ->
     lists:filter(
         fun(Process) ->
-            case (catch process_info(get_pid(Process), Property)) of
+            case ?try_catch(fun erlang:process_info/2, [get_pid(Process), Property]) of
                 {Property, Value} when is_integer(Value) andalso Value > Threshold ->
                     true;
                 _ ->
@@ -717,7 +717,7 @@ info(Port, Info) when is_port(Port) ->
 port_info(Port, Items) ->
     lists:foldl(
         fun(Item, Acc) ->
-            case (catch erlang:port_info(Port, Item)) of
+            case ?try_catch(fun erlang:port_info/2, [Port, Item]) of
                 {Item, _Value} = Info -> [Info | Acc];
                 _Else -> Acc
             end
@@ -1229,7 +1229,7 @@ setup() ->
 teardown({_InitialPid, Processes, _Tree}) ->
     [
         begin
-            (catch unlink(Pid)),
+            ?try_catch(fun erlang:unlink/1, [Pid]),
             exit(Pid, kill)
         end
      || Pid <- Processes
