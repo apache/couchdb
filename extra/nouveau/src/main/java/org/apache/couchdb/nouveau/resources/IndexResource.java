@@ -24,8 +24,8 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response.Status;
@@ -43,7 +43,7 @@ import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.IndexManager;
 
-@Path("/index/{name}")
+@Path("/index")
 @Metered
 @ResponseMetered
 @ExceptionMetered(cause = IOException.class)
@@ -58,7 +58,7 @@ public final class IndexResource {
     }
 
     @PUT
-    public Ok createIndex(@PathParam("name") String name, @NotNull @Valid IndexDefinition indexDefinition)
+    public Ok createIndex(@QueryParam("name") String name, @NotNull @Valid IndexDefinition indexDefinition)
             throws IOException {
         if (!indexDefinition.isLatestVersion()) {
             throw new WebApplicationException(
@@ -69,35 +69,21 @@ public final class IndexResource {
         return Ok.INSTANCE;
     }
 
-    @Deprecated(since = "3.5.2", forRemoval = true)
     @DELETE
-    @Path("/doc/{docId}")
-    public Ok deleteDoc(
-            @PathParam("name") String name,
-            @PathParam("docId") String docId,
-            @NotNull @Valid DocumentDeleteRequest request)
-            throws Exception {
-        return indexManager.with(name, (index) -> {
-            index.delete(docId, request);
-            return Ok.INSTANCE;
-        });
-    }
-
-    @DELETE
-    public Ok deletePath(@PathParam("name") String path, @Valid final List<String> exclusions) throws IOException {
+    public Ok deletePath(@QueryParam("name") String path, @Valid final List<String> exclusions) throws IOException {
         indexManager.deleteAll(path, exclusions);
         return Ok.INSTANCE;
     }
 
     @GET
-    public IndexInfoResponse getIndexInfo(@PathParam("name") String name) throws Exception {
+    public IndexInfoResponse getIndexInfo(@QueryParam("name") String name) throws Exception {
         return indexManager.with(name, (index) -> {
             return index.info();
         });
     }
 
     @POST
-    public Ok setIndexInfo(@PathParam("name") String name, @NotNull @Valid IndexInfoRequest request) throws Exception {
+    public Ok setIndexInfo(@QueryParam("name") String name, @NotNull @Valid IndexInfoRequest request) throws Exception {
         return indexManager.with(name, (index) -> {
             var shouldCommit = false;
             if (request.matchUpdateSeq().isPresent() && request.updateSeq().isPresent()) {
@@ -120,30 +106,16 @@ public final class IndexResource {
 
     @POST
     @Path("/search")
-    public SearchResults searchIndex(@PathParam("name") String name, @NotNull @Valid SearchRequest request)
+    public SearchResults searchIndex(@QueryParam("name") String name, @NotNull @Valid SearchRequest request)
             throws Exception {
         return indexManager.with(name, (index) -> {
             return index.search(request);
         });
     }
 
-    @Deprecated(since = "3.5.2", forRemoval = true)
-    @PUT
-    @Path("/doc/{docId}")
-    public Ok updateDoc(
-            @PathParam("name") String name,
-            @PathParam("docId") String docId,
-            @NotNull @Valid DocumentUpdateRequest request)
-            throws Exception {
-        return indexManager.with(name, (index) -> {
-            index.update(docId, request);
-            return Ok.INSTANCE;
-        });
-    }
-
     @POST
     @Path("/update")
-    public Ok update(@PathParam("name") String name, @NotNull @Valid BulkUpdateRequest request) throws Exception {
+    public Ok update(@QueryParam("name") String name, @NotNull @Valid BulkUpdateRequest request) throws Exception {
         return indexManager.with(name, (index) -> {
             for (var update : request.updates()) {
                 if (update.update() instanceof DocumentUpdateRequest) {

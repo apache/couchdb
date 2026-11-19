@@ -17,5 +17,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
 public record StoredField(
-        String name, @NotNull @Schema(oneOf = {String.class, Double.class, byte[].class}) Object value)
-        implements Field {}
+        String name,
+
+        @NotNull @Schema(oneOf = {String.class, Double.class, byte[].class})
+        Object value) implements Field {}

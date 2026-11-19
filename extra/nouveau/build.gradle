@@ -1,6 +1,6 @@
 plugins {
     id 'application'
-    id 'com.diffplug.spotless' version '8.0.0'
+    id 'com.diffplug.spotless' version '8.11.0'
     id 'jacoco'
 }
 
@@ -16,14 +16,14 @@ repositories {
 }
 
 dependencies {
-    implementation platform('io.dropwizard:dropwizard-dependencies:4.0.17')
+    implementation platform('io.dropwizard:dropwizard-dependencies:5.0.2')
     implementation 'io.dropwizard:dropwizard-core'
     implementation 'io.dropwizard:dropwizard-http2'
     implementation 'io.dropwizard.metrics:metrics-core'
     implementation 'io.dropwizard.metrics:metrics-jersey2'
     testImplementation 'io.dropwizard:dropwizard-testing'
 
-    def luceneVersion = '10.5.2'
+    def luceneVersion = '10.6.0'
     implementation 'org.apache.lucene:lucene-core:' + luceneVersion
     implementation 'org.apache.lucene:lucene-queryparser:' + luceneVersion
     implementation 'org.apache.lucene:lucene-analysis-common:' + luceneVersion
@@ -34,7 +34,7 @@ dependencies {
     implementation 'org.apache.lucene:lucene-misc:' + luceneVersion
     implementation 'org.apache.lucene:lucene-backward-codecs:' + luceneVersion
 
-    def swaggerVersion = '2.2.8'
+    def swaggerVersion = '2.2.25'
     implementation 'io.swagger.core.v3:swagger-jaxrs2-jakarta:' + swaggerVersion
     implementation 'io.swagger.core.v3:swagger-jaxrs2-servlet-initializer-v2:' + swaggerVersion
 
