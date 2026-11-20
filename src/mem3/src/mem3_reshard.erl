@@ -48,6 +48,7 @@
 ]).
 
 -include("mem3_reshard.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -define(JOB_ID_VERSION, 1).
 -define(JOB_STATE_VERSION, 1).
@@ -214,8 +215,8 @@ init(_) ->
 
 terminate(Reason, State) ->
     couch_log:notice("~p terminate ~p ~p", [?MODULE, Reason, statefmt(State)]),
-    catch unlink(State#state.db_monitor),
-    catch exit(State#state.db_monitor, kill),
+    ?try_catch(fun erlang:unlink/1, [State#state.db_monitor]),
+    ?try_catch(fun erlang:exit/2, [State#state.db_monitor, kill]),
     lists:foreach(fun(Job) -> kill_job_int(Job) end, running_jobs()).
 
 handle_call(start, _From, #state{state = stopped} = State) ->

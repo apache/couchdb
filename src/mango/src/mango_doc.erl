@@ -383,7 +383,7 @@ get_field(Props, Field, Validator) when is_binary(Field) ->
 get_field(Props, [], no_validation) ->
     Props;
 get_field(Props, [], Validator) ->
-    case (catch Validator(Props)) of
+    case ?try_catch(Validator, [Props]) of
         true ->
             Props;
         _ ->

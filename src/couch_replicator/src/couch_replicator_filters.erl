@@ -109,7 +109,7 @@ view_type(Props, Options) ->
 
 fetch_internal(DDocName, FilterName, Source) ->
     Db =
-        case (catch couch_replicator_api_wrap:db_open(Source)) of
+        case ?try_catch(fun couch_replicator_api_wrap:db_open/1, [Source]) of
             {ok, Db0} ->
                 Db0;
             DbError ->
@@ -125,9 +125,9 @@ fetch_internal(DDocName, FilterName, Source) ->
     try
         Body =
             case
-                (catch couch_replicator_api_wrap:open_doc(
+                ?try_catch(fun couch_replicator_api_wrap:open_doc/3, [
                     Db, <<"_design/", DDocName/binary>>, [ejson_body]
-                ))
+                ])
             of
                 {ok, #doc{body = Body0}} ->
                     Body0;

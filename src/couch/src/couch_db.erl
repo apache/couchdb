@@ -958,7 +958,7 @@ group_alike_docs([Doc | Rest], [Bucket | RestBuckets]) ->
     end.
 
 validate_doc_update(#db{} = Db, #doc{id = <<"_design/", _/binary>>} = Doc, _GetDiskDocFun) ->
-    case catch check_is_admin(Db) of
+    case ?try_catch(fun check_is_admin/1, [Db]) of
         ok -> validate_ddoc(Db, Doc);
         Error -> Error
     end;

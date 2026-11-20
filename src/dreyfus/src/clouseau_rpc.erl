@@ -328,9 +328,10 @@ connected() ->
                     %  > clouseau_rpc:version().
                     %     {'EXIT',noconnection}
                     %
-                    case (catch version()) of
-                        {ok, _} -> true;
-                        _ -> false
+                    try version() of
+                        {ok, _} -> true
+                    catch
+                        _:_ -> false
                     end;
                 _ ->
                     false

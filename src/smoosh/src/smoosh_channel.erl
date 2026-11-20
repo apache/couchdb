@@ -26,6 +26,8 @@
     handle_info/2
 ]).
 
+-include_lib("couch/include/couch_db.hrl").
+
 -define(INDEX_CLEANUP, index_cleanup).
 -define(TIME_WINDOW_MSEC, 60 * 1000).
 -define(CHECKPOINT_INTERVAL_MSEC, 180000).
@@ -496,10 +498,10 @@ do_resume(#state{active = Active} = State) ->
     State#state{paused = false}.
 
 suspend_pid(Pid) when is_pid(Pid) ->
-    catch erlang:suspend_process(Pid, [unless_suspending]).
+    ?try_catch(fun erlang:suspend_process/2, [Pid, [unless_suspending]]).
 
 resume_pid(Pid) when is_pid(Pid) ->
-    catch erlang:resume_process(Pid).
+    ?try_catch(fun erlang:resume_process/1, [Pid]).
 
 -ifdef(TEST).
 

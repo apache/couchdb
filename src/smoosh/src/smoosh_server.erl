@@ -47,6 +47,8 @@
     access_cleaner/0
 ]).
 
+-include_lib("couch/include/couch_db.hrl").
+
 -ifdef(TEST).
 -define(STALENESS_MIN, 0).
 -define(ACCEESS_CLEAN_INTERVAL_MSEC, 300).
@@ -256,7 +258,7 @@ handle_info(_Msg, State) ->
     {noreply, State}.
 
 terminate(_Reason, #state{access_cleaner = CPid}) ->
-    catch unlink(CPid),
+    ?try_catch(fun erlang:unlink/1, [CPid]),
     exit(CPid, kill),
     Fun = fun(#channel{pid = P}, _) ->
         smoosh_channel:close(P)

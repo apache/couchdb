@@ -42,6 +42,7 @@
 ]).
 
 -include("couch_replicator.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -import(couch_replicator_utils, [
     get_json_value/2,
@@ -542,7 +543,7 @@ docs(States) ->
 doc(Db, DocId) ->
     HealthThreshold = couch_replicator_scheduler:health_threshold(),
     Res =
-        (catch ets:foldl(
+        ?try_catch(fun ets:foldl/3, [
             fun(RDoc, nil) ->
                 {Shard, RDocId} = RDoc#rdoc.id,
                 case {mem3:dbname(Shard), RDocId} of
@@ -554,7 +555,7 @@ doc(Db, DocId) ->
             end,
             nil,
             ?MODULE
-        )),
+        ]),
     case Res of
         {found, DocInfo} ->
             {ok, DocInfo};

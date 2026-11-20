@@ -124,7 +124,7 @@ reschedule() ->
 
 -spec rep_state(rep_id()) -> #rep{} | nil.
 rep_state(RepId) ->
-    case (catch ets:lookup_element(?MODULE, RepId, #job.rep)) of
+    case ?try_catch(fun ets:lookup_element/3, [?MODULE, RepId, #job.rep]) of
         {'EXIT', {badarg, _}} ->
             nil;
         Rep ->
@@ -1504,7 +1504,7 @@ t_job_summary_proxy_fields(_) ->
 % Test helper functions
 
 setup_all() ->
-    catch ets:delete(?MODULE),
+    ?try_catch(fun ets:delete/1, [?MODULE]),
     meck:expect(config, get, 1, []),
     meck:expect(config, get, 2, undefined),
     meck:expect(couch_log, notice, 2, ok),
@@ -1519,7 +1519,7 @@ setup_all() ->
 
 teardown_all(_) ->
     couch_replicator_share:clear(),
-    catch ets:delete(?MODULE),
+    ?try_catch(fun ets:delete/1, [?MODULE]),
     meck:unload().
 
 setup() ->

@@ -174,7 +174,7 @@ handle_action(_, _) ->
     {error, <<"Invalid Action'">>}.
 
 get_body(Req) ->
-    case catch couch_httpd:json_body_obj(Req) of
+    case ?try_catch(fun couch_httpd:json_body_obj/1, [Req]) of
         {Body} ->
             Body;
         Else ->

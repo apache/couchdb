@@ -119,7 +119,7 @@ fold_files2([], _Dir, _RegExp, _Recursive, _Fun, Acc) ->
     Acc;
 fold_files2([File | Rest], Dir, RegExp, Recursive, Fun, Acc0) ->
     FullName = filename:join(Dir, File),
-    case (catch re:run(File, RegExp, [{capture, none}])) of
+    case ?try_catch(fun re:run/3, [File, RegExp, [{capture, none}]]) of
         match ->
             Acc1 = Fun(FullName, Acc0),
             fold_files2(Rest, Dir, RegExp, Recursive, Fun, Acc1);
@@ -155,8 +155,8 @@ shutdown_sync(Pid) when not is_pid(Pid) ->
 shutdown_sync(Pid) ->
     MRef = monitor(process, Pid),
     try
-        catch unlink(Pid),
-        catch exit(Pid, shutdown),
+        ?try_catch(fun erlang:unlink/1, [Pid]),
+        ?try_catch(fun erlang:exit/2, [Pid, shutdown]),
         receive
             {'DOWN', MRef, _, _, _} ->
                 ok
@@ -554,7 +554,7 @@ with_db(DbName, Fun) when is_binary(DbName) ->
             try
                 Fun(Db)
             after
-                catch couch_db:close(Db)
+                ?try_catch(fun couch_db:close/1, [Db])
             end;
         Else ->
             throw(Else)

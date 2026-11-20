@@ -205,7 +205,7 @@ handle_info(
                 true ->
                     ok
             end,
-            [catch (ClientPid ! {done, self()}) || ClientPid <- Clients],
+            [?try_catch(fun erlang:send/2, [ClientPid, {done, self()}]) || ClientPid <- Clients],
             Db3 =
                 case length(UpdatedDDocIds) > 0 of
                     true ->
@@ -228,7 +228,7 @@ handle_info(
             {noreply, Db3}
     catch
         throw:retry ->
-            [catch (ClientPid ! {retry, self()}) || ClientPid <- Clients],
+            [?try_catch(fun erlang:send/2, [ClientPid, {retry, self()}]) || ClientPid <- Clients],
             {noreply, Db}
     end;
 handle_info({'EXIT', _Pid, normal}, Db) ->
@@ -461,7 +461,7 @@ upgrade_sizes(S) when is_integer(S) ->
 
 send_result(Client, Doc, NewResult) ->
     % used to send a result to the client
-    catch (Client ! {result, self(), {doc_tag(Doc), NewResult}}).
+    ?try_catch(fun erlang:send/2, [Client, {result, self(), {doc_tag(Doc), NewResult}}]).
 
 doc_tag(#doc{meta = Meta}) ->
     case lists:keyfind(ref, 1, Meta) of

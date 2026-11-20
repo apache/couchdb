@@ -369,7 +369,7 @@ handle_db_event(DbName, {ddoc_updated, DDocId}, St) ->
         fun({_DbName, {_DDocId, Sig}}) ->
             case ets:lookup(St#st.by_sig, {DbName, Sig}) of
                 [{_, IndexPid}] ->
-                    (catch gen_server:cast(IndexPid, ddoc_updated));
+                    ?try_catch(fun gen_server:cast/2, [IndexPid, ddoc_updated]);
                 [] ->
                     ok
             end

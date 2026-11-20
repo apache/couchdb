@@ -15,6 +15,7 @@
 -behaviour(config_listener).
 
 -compile(tuple_calls).
+-include_lib("couch/include/couch_db.hrl").
 
 -export([start_link/0, reload/0, get_state/0, dispatch_host/1]).
 -export([urlsplit_netloc/2, redirect_to_vhost/2]).
@@ -327,13 +328,13 @@ split_host_port(HostAsString) ->
         N ->
             HostPart = string:substr(HostAsString, 1, N - 1),
             case
-                (catch list_to_integer(
+                ?try_catch(fun list_to_integer/1, [
                     string:substr(
                         HostAsString,
                         N + 1,
                         length(HostAsString)
                     )
-                ))
+                ])
             of
                 {'EXIT', _} ->
                     {split_host(HostAsString), '*'};
