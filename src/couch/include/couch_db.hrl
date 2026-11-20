@@ -53,6 +53,19 @@
 -define(INTERACTIVE_EDIT, interactive_edit).
 -define(REPLICATED_CHANGES, replicated_changes).
 
+-define(try_catch(F, A), ?try_catch(erlang, apply, [F, A])).
+-define(try_catch(M, F, A),
+    (fun() ->
+        try
+            apply(M, F, A)
+        catch
+            throw:__Term -> __Term;
+            exit:__Reason -> {'EXIT', __Reason};
+            error:__Reason:__Stacktrace -> {'EXIT', {__Reason, __Stacktrace}}
+        end
+     end)()
+).
+
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.
 -type update_type() :: replicated_changes | interactive_edit.

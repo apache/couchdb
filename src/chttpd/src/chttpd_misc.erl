@@ -198,7 +198,7 @@ handle_dbs_info_req(#httpd{method = 'POST', path_parts = [<<"_dbs_info">>]} = Re
     send_chunk(Resp, "["),
     lists:foldl(
         fun(DbName, AccSeparator) ->
-            case catch fabric:get_db_info(DbName) of
+            case ?try_catch(fun fabric:get_db_info/1, [DbName]) of
                 {ok, Result} ->
                     Json = ?JSON_ENCODE({[{key, DbName}, {info, {Result}}]}),
                     send_chunk(Resp, AccSeparator ++ Json);
