@@ -33,6 +33,9 @@
 % If the request's userCtx identifies an admin
 %   -> save_doc (see below)
 %
+% If the update is a replicated change (new_edits=false)
+%   -> 403 // Forbidden
+%
 % If the request's userCtx.name is null:
 %   -> save_doc
 %   // this is an anonymous user registering a new document
@@ -42,12 +45,14 @@
 %   -> 404 // Not Found
 % Else
 %   -> save_doc
-before_doc_update(Doc, Db, _UpdateType) ->
+before_doc_update(Doc, Db, UpdateType) ->
     #user_ctx{name = Name} = couch_db:get_user_ctx(Db),
     DocName = get_doc_name(Doc),
     case (catch couch_db:check_is_admin(Db)) of
         ok ->
             save_doc(Doc);
+        _ when UpdateType =:= ?REPLICATED_CHANGES ->
+            throw({forbidden, ~"Only admins may replicate user documents."});
         _ when Name =:= DocName orelse Name =:= null ->
             save_doc(Doc);
         _ ->
