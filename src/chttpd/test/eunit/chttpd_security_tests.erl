@@ -105,22 +105,22 @@ all_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun should_allow_admin_db_compaction/1,
-                    fun should_allow_valid_password_to_create_user/1,
-                    fun should_disallow_invalid_password_to_create_user/1,
-                    fun should_disallow_anonymous_db_compaction/1,
-                    fun should_disallow_db_member_db_compaction/1,
-                    fun should_allow_db_admin_db_compaction/1,
-                    fun should_allow_admin_view_compaction/1,
-                    fun should_disallow_anonymous_view_compaction/1,
-                    fun should_allow_admin_db_view_cleanup/1,
-                    fun should_disallow_anonymous_db_view_cleanup/1,
-                    fun should_allow_admin_purge/1,
-                    fun should_disallow_anonymous_purge/1,
-                    fun should_disallow_db_member_purge/1,
-                    fun should_allow_admin_purged_infos_limit/1,
-                    fun should_disallow_anonymous_purged_infos_limit/1,
-                    fun should_disallow_db_member_purged_infos_limit/1
+                    ?TDEF_FE(t_allow_admin_db_compaction),
+                    ?TDEF_FE(t_allow_valid_password_to_create_user),
+                    ?TDEF_FE(t_disallow_invalid_password_to_create_user),
+                    ?TDEF_FE(t_disallow_anonymous_db_compaction),
+                    ?TDEF_FE(t_disallow_db_member_db_compaction),
+                    ?TDEF_FE(t_allow_db_admin_db_compaction),
+                    ?TDEF_FE(t_allow_admin_view_compaction),
+                    ?TDEF_FE(t_disallow_anonymous_view_compaction),
+                    ?TDEF_FE(t_allow_admin_db_view_cleanup),
+                    ?TDEF_FE(t_disallow_anonymous_db_view_cleanup),
+                    ?TDEF_FE(t_allow_admin_purge),
+                    ?TDEF_FE(t_disallow_anonymous_purge),
+                    ?TDEF_FE(t_disallow_db_member_purge),
+                    ?TDEF_FE(t_allow_admin_purged_infos_limit),
+                    ?TDEF_FE(t_disallow_anonymous_purged_infos_limit),
+                    ?TDEF_FE(t_disallow_db_member_purged_infos_limit)
                 ]
             }
         }
@@ -138,34 +138,124 @@ security_object_validate_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun should_return_ok_for_sec_obj_with_roles/1,
-                    fun should_return_ok_for_sec_obj_with_names/1,
-                    fun should_return_ok_for_sec_obj_with_roles_and_names/1,
-                    fun should_return_error_for_sec_obj_with_incorrect_roles_and_names/1,
-                    fun should_return_error_for_sec_obj_with_incorrect_roles/1,
-                    fun should_return_error_for_sec_obj_with_incorrect_names/1,
-                    fun should_return_error_for_sec_obj_in_user_db/1
+                    ?TDEF_FE(t_return_ok_for_sec_obj_with_roles),
+                    ?TDEF_FE(t_return_ok_for_sec_obj_with_names),
+                    ?TDEF_FE(t_return_ok_for_sec_obj_with_roles_and_names),
+                    ?TDEF_FE(t_return_error_for_sec_obj_with_incorrect_roles_and_names),
+                    ?TDEF_FE(t_return_error_for_sec_obj_with_incorrect_roles),
+                    ?TDEF_FE(t_return_error_for_sec_obj_with_incorrect_names),
+                    ?TDEF_FE(t_return_error_for_sec_obj_in_user_db)
                 ]
             }
         }
     }.
 
-should_allow_admin_db_compaction([Url, _UsersUrl]) ->
-    ?_assertEqual(
-        true,
-        begin
-            {ok, _, _, ResultBody} = test_request:post(
-                Url ++ "/_compact",
-                [?CONTENT_JSON, ?AUTH],
-                ""
-            ),
-            ResultJson = ?JSON_DECODE(ResultBody),
-            {InnerJson} = ResultJson,
-            couch_util:get_value(<<"ok">>, InnerJson, undefined)
-        end
-    ).
+users_db_new_edits_false_test_() ->
+    {
+        "chttpd users db replicated changes tests",
+        {
+            setup,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup_public_users_db/0,
+                fun teardown_public_users_db/1,
+                [
+                    ?TDEF_FE(t_allow_anon_user_signup),
+                    ?TDEF_FE(t_no_anon_replicated_user_doc),
+                    ?TDEF_FE(t_no_user_replicated_own_doc),
+                    ?TDEF_FE(t_allow_admin_replicated_user_doc)
+                ]
+            }
+        }
+    }.
 
-should_allow_valid_password_to_create_user([_Url, UsersUrl]) ->
+setup_public_users_db() ->
+    [_Url, UsersUrl] = Ctx = setup(),
+    ok = config:set("couchdb", "users_db_security_editable", "true", false),
+    SecObj = #{
+        ~"admins" => #{~"names" => [], ~"roles" => [~"_admin"]},
+        ~"members" => #{~"names" => [], ~"roles" => []}
+    },
+    {ok, 200, _, _} = test_request:put(
+        UsersUrl ++ "/_security", [?CONTENT_JSON, ?AUTH], jiffy:encode(SecObj)
+    ),
+    Ctx.
+
+teardown_public_users_db(Ctx) ->
+    ok = config:delete("couchdb", "users_db_security_editable", false),
+    teardown(Ctx).
+
+t_allow_anon_user_signup([_Url, UsersUrl]) ->
+    Doc = #{~"type" => ~"user", ~"name" => ~"x", ~"roles" => [], ~"password" => ~"y"},
+    {ok, Status, _, _} = test_request:put(
+        UsersUrl ++ "/org.couchdb.user:x", [?CONTENT_JSON], jiffy:encode(Doc)
+    ),
+    ?assertEqual(201, Status).
+
+t_no_anon_replicated_user_doc([_Url, UsersUrl]) ->
+    DocUrl = UsersUrl ++ "/org.couchdb.user:" ++ ?TEST_MEMBER,
+    Doc = rep_user_doc(?TEST_MEMBER),
+    {ok, BulkStatus, _, _} = test_request:post(
+        UsersUrl ++ "/_bulk_docs",
+        [?CONTENT_JSON],
+        jiffy:encode(#{~"new_edits" => false, ~"docs" => [Doc]})
+    ),
+    {ok, PutStatus, _, _} = test_request:put(
+        DocUrl ++ "?new_edits=false", [?CONTENT_JSON], jiffy:encode(Doc)
+    ),
+    ?assertEqual(403, BulkStatus),
+    ?assertEqual(403, PutStatus),
+    ?assertEqual(undefined, get_conflicts(DocUrl)).
+
+t_no_user_replicated_own_doc([_Url, UsersUrl]) ->
+    DocUrl = UsersUrl ++ "/org.couchdb.user:" ++ ?TEST_MEMBER,
+    Doc = rep_user_doc(?TEST_MEMBER),
+    {ok, Status, _, _} = test_request:post(
+        UsersUrl ++ "/_bulk_docs",
+        [?CONTENT_JSON, ?TEST_MEMBER_AUTH],
+        jiffy:encode(#{~"new_edits" => false, ~"docs" => [Doc]})
+    ),
+    ?assertEqual(403, Status),
+    ?assertEqual(undefined, get_conflicts(DocUrl)).
+
+t_allow_admin_replicated_user_doc([_Url, UsersUrl]) ->
+    DocUrl = UsersUrl ++ "/org.couchdb.user:" ++ ?TEST_MEMBER,
+    Doc = rep_user_doc(?TEST_MEMBER),
+    {ok, Status, _, _} = test_request:post(
+        UsersUrl ++ "/_bulk_docs",
+        [?CONTENT_JSON, ?AUTH],
+        jiffy:encode(#{~"new_edits" => false, ~"docs" => [Doc]})
+    ),
+    ?assertEqual(201, Status),
+    ?assertMatch([_], get_conflicts(DocUrl)).
+
+rep_user_doc(Name) ->
+    #{
+        ~"_id" => ?l2b("org.couchdb.user:" ++ Name),
+        ~"_rev" => ~"2-0123456789abcdef0123456789abcdef",
+        ~"type" => ~"user",
+        ~"name" => ?l2b(Name),
+        ~"roles" => []
+    }.
+
+get_conflicts(DocUrl) ->
+    {ok, 200, _, Body} = test_request:get(DocUrl ++ "?conflicts=true", [?AUTH]),
+    {Props} = ?JSON_DECODE(Body),
+    couch_util:get_value(~"_conflicts", Props).
+
+t_allow_admin_db_compaction([Url, _UsersUrl]) ->
+    {ok, _, _, ResultBody} = test_request:post(
+        Url ++ "/_compact",
+        [?CONTENT_JSON, ?AUTH],
+        ""
+    ),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ?assertEqual(true, couch_util:get_value(~"ok", InnerJson, undefined)).
+
+t_allow_valid_password_to_create_user([_Url, UsersUrl]) ->
     UserDoc =
         "{\"_id\": \"org.couchdb.user:foo\", \"name\": \"foo\",\n"
         "                \"type\": \"user\", \"roles\": [], \"password\": \"bar\"}",
@@ -176,9 +266,9 @@ should_allow_valid_password_to_create_user([_Url, UsersUrl]) ->
     ),
     ResultJson = ?JSON_DECODE(ResultBody),
     {InnerJson} = ResultJson,
-    ?_assertEqual(true, couch_util:get_value(<<"ok">>, InnerJson)).
+    ?assertEqual(true, couch_util:get_value(~"ok", InnerJson)).
 
-should_disallow_invalid_password_to_create_user([_Url, UsersUrl]) ->
+t_disallow_invalid_password_to_create_user([_Url, UsersUrl]) ->
     UserDoc =
         "{\"_id\": \"org.couchdb.user:foo\", \"name\": \"foo\",\n"
         "                \"type\": \"user\", \"roles\": [], \"password\": 123}",
@@ -190,9 +280,9 @@ should_disallow_invalid_password_to_create_user([_Url, UsersUrl]) ->
     ResultJson = ?JSON_DECODE(ResultBody),
     {InnerJson} = ResultJson,
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
-    ?_assertEqual(<<"forbidden">>, ErrType).
+    ?assertEqual(~"forbidden", ErrType).
 
-should_disallow_anonymous_db_compaction([Url, _UsersUrl]) ->
+t_disallow_anonymous_db_compaction([Url, _UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(
         Url ++ "/_compact",
         [?CONTENT_JSON],
@@ -201,9 +291,9 @@ should_disallow_anonymous_db_compaction([Url, _UsersUrl]) ->
     ResultJson = ?JSON_DECODE(ResultBody),
     {InnerJson} = ResultJson,
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
-    ?_assertEqual(<<"unauthorized">>, ErrType).
+    ?assertEqual(~"unauthorized", ErrType).
 
-should_disallow_db_member_db_compaction([Url, _UsersUrl]) ->
+t_disallow_db_member_db_compaction([Url, _UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(
         Url ++ "/_compact",
         [?CONTENT_JSON, ?TEST_MEMBER_AUTH],
@@ -212,39 +302,29 @@ should_disallow_db_member_db_compaction([Url, _UsersUrl]) ->
     ResultJson = ?JSON_DECODE(ResultBody),
     {InnerJson} = ResultJson,
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
-    ?_assertEqual(<<"unauthorized">>, ErrType).
+    ?assertEqual(~"unauthorized", ErrType).
 
-should_allow_db_admin_db_compaction([Url, _UsersUrl]) ->
-    ?_assertEqual(
-        true,
-        begin
-            {ok, _, _, ResultBody} = test_request:post(
-                Url ++ "/_compact",
-                [?CONTENT_JSON, ?TEST_ADMIN_AUTH],
-                ""
-            ),
-            ResultJson = ?JSON_DECODE(ResultBody),
-            {InnerJson} = ResultJson,
-            couch_util:get_value(<<"ok">>, InnerJson, undefined)
-        end
-    ).
+t_allow_db_admin_db_compaction([Url, _UsersUrl]) ->
+    {ok, _, _, ResultBody} = test_request:post(
+        Url ++ "/_compact",
+        [?CONTENT_JSON, ?TEST_ADMIN_AUTH],
+        ""
+    ),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ?assertEqual(true, couch_util:get_value(~"ok", InnerJson, undefined)).
 
-should_allow_admin_view_compaction([Url, _UsersUrl]) ->
-    ?_assertEqual(
-        true,
-        begin
-            {ok, _, _, ResultBody} = test_request:post(
-                Url ++ "/_compact/test",
-                [?CONTENT_JSON, ?AUTH],
-                ""
-            ),
-            ResultJson = ?JSON_DECODE(ResultBody),
-            {InnerJson} = ResultJson,
-            couch_util:get_value(<<"ok">>, InnerJson, undefined)
-        end
-    ).
+t_allow_admin_view_compaction([Url, _UsersUrl]) ->
+    {ok, _, _, ResultBody} = test_request:post(
+        Url ++ "/_compact/test",
+        [?CONTENT_JSON, ?AUTH],
+        ""
+    ),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ?assertEqual(true, couch_util:get_value(~"ok", InnerJson, undefined)).
 
-should_disallow_anonymous_view_compaction([Url, _UsersUrl]) ->
+t_disallow_anonymous_view_compaction([Url, _UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(
         Url ++ "/_compact/test",
         [?CONTENT_JSON],
@@ -253,24 +333,19 @@ should_disallow_anonymous_view_compaction([Url, _UsersUrl]) ->
     ResultJson = ?JSON_DECODE(ResultBody),
     {InnerJson} = ResultJson,
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
-    ?_assertEqual(<<"unauthorized">>, ErrType).
+    ?assertEqual(~"unauthorized", ErrType).
 
-should_allow_admin_db_view_cleanup([Url, _UsersUrl]) ->
-    ?_assertEqual(
-        true,
-        begin
-            {ok, _, _, ResultBody} = test_request:post(
-                Url ++ "/_view_cleanup",
-                [?CONTENT_JSON, ?AUTH],
-                ""
-            ),
-            ResultJson = ?JSON_DECODE(ResultBody),
-            {InnerJson} = ResultJson,
-            couch_util:get_value(<<"ok">>, InnerJson, undefined)
-        end
-    ).
+t_allow_admin_db_view_cleanup([Url, _UsersUrl]) ->
+    {ok, _, _, ResultBody} = test_request:post(
+        Url ++ "/_view_cleanup",
+        [?CONTENT_JSON, ?AUTH],
+        ""
+    ),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ?assertEqual(true, couch_util:get_value(~"ok", InnerJson, undefined)).
 
-should_disallow_anonymous_db_view_cleanup([Url, _UsersUrl]) ->
+t_disallow_anonymous_db_view_cleanup([Url, _UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(
         Url ++ "/_view_cleanup",
         [?CONTENT_JSON],
@@ -279,25 +354,20 @@ should_disallow_anonymous_db_view_cleanup([Url, _UsersUrl]) ->
     ResultJson = ?JSON_DECODE(ResultBody),
     {InnerJson} = ResultJson,
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
-    ?_assertEqual(<<"unauthorized">>, ErrType).
+    ?assertEqual(~"unauthorized", ErrType).
 
-should_allow_admin_purge([Url, _UsersUrl]) ->
-    ?_assertEqual(
-        null,
-        begin
-            IdsRevs = "{}",
-            {ok, _, _, ResultBody} = test_request:post(
-                Url ++ "/_purge",
-                [?CONTENT_JSON, ?AUTH],
-                IdsRevs
-            ),
-            ResultJson = ?JSON_DECODE(ResultBody),
-            {InnerJson} = ResultJson,
-            couch_util:get_value(<<"purge_seq">>, InnerJson, undefined)
-        end
-    ).
+t_allow_admin_purge([Url, _UsersUrl]) ->
+    IdsRevs = "{}",
+    {ok, _, _, ResultBody} = test_request:post(
+        Url ++ "/_purge",
+        [?CONTENT_JSON, ?AUTH],
+        IdsRevs
+    ),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ?assertEqual(null, couch_util:get_value(~"purge_seq", InnerJson, undefined)).
 
-should_disallow_anonymous_purge([Url, _UsersUrl]) ->
+t_disallow_anonymous_purge([Url, _UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(
         Url ++ "/_purge",
         [?CONTENT_JSON],
@@ -306,9 +376,9 @@ should_disallow_anonymous_purge([Url, _UsersUrl]) ->
     ResultJson = ?JSON_DECODE(ResultBody),
     {InnerJson} = ResultJson,
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
-    ?_assertEqual(<<"unauthorized">>, ErrType).
+    ?assertEqual(~"unauthorized", ErrType).
 
-should_disallow_db_member_purge([Url, _UsersUrl]) ->
+t_disallow_db_member_purge([Url, _UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(
         Url ++ "/_purge",
         [?CONTENT_JSON, ?TEST_MEMBER_AUTH],
@@ -317,25 +387,31 @@ should_disallow_db_member_purge([Url, _UsersUrl]) ->
     ResultJson = ?JSON_DECODE(ResultBody),
     {InnerJson} = ResultJson,
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
-    ?_assertEqual(<<"unauthorized">>, ErrType).
+    ?assertEqual(~"unauthorized", ErrType).
 
-should_allow_admin_purged_infos_limit([Url, _UsersUrl]) ->
-    ?_assertEqual(
-        true,
-        begin
-            {ok, _, _, ResultBody} = test_request:put(
-                Url ++
-                    "/_purged_infos_limit/",
-                [?CONTENT_JSON, ?AUTH],
-                "2"
-            ),
-            ResultJson = ?JSON_DECODE(ResultBody),
-            {InnerJson} = ResultJson,
-            couch_util:get_value(<<"ok">>, InnerJson, undefined)
-        end
-    ).
+t_allow_admin_purged_infos_limit([Url, _UsersUrl]) ->
+    {ok, _, _, ResultBody} = test_request:put(
+        Url ++
+            "/_purged_infos_limit/",
+        [?CONTENT_JSON, ?AUTH],
+        "2"
+    ),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ?assertEqual(true, couch_util:get_value(~"ok", InnerJson, undefined)).
 
-should_disallow_anonymous_purged_infos_limit([Url, _UsersUrl]) ->
+t_disallow_anonymous_purged_infos_limit([Url, _UsersUrl]) ->
+    {ok, _, _, ResultBody} = test_request:put(
+        Url ++ "/_purged_infos_limit/",
+        [?CONTENT_JSON],
+        "2"
+    ),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ErrType = couch_util:get_value(<<"error">>, InnerJson),
+    ?assertEqual(~"unauthorized", ErrType).
+
+t_disallow_db_member_purged_infos_limit([Url, _UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:put(
         Url ++ "/_purged_infos_limit/",
         [?CONTENT_JSON, ?TEST_MEMBER_AUTH],
@@ -344,20 +420,9 @@ should_disallow_anonymous_purged_infos_limit([Url, _UsersUrl]) ->
     ResultJson = ?JSON_DECODE(ResultBody),
     {InnerJson} = ResultJson,
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
-    ?_assertEqual(<<"unauthorized">>, ErrType).
+    ?assertEqual(~"unauthorized", ErrType).
 
-should_disallow_db_member_purged_infos_limit([Url, _UsersUrl]) ->
-    {ok, _, _, ResultBody} = test_request:put(
-        Url ++ "/_purged_infos_limit/",
-        [?CONTENT_JSON, ?TEST_MEMBER_AUTH],
-        "2"
-    ),
-    ResultJson = ?JSON_DECODE(ResultBody),
-    {InnerJson} = ResultJson,
-    ErrType = couch_util:get_value(<<"error">>, InnerJson),
-    ?_assertEqual(<<"unauthorized">>, ErrType).
-
-should_return_ok_for_sec_obj_with_roles([Url, _UsersUrl]) ->
+t_return_ok_for_sec_obj_with_roles([Url, _UsersUrl]) ->
     SecurityUrl = lists:concat([Url, "/_security"]),
     SecurityProperties = [
         {<<"admins">>, {[{<<"roles">>, [<<?TEST_ADMIN>>]}]}},
@@ -370,9 +435,9 @@ should_return_ok_for_sec_obj_with_roles([Url, _UsersUrl]) ->
         [?CONTENT_JSON, ?AUTH],
         Body
     ),
-    ?_assertEqual(200, Status).
+    ?assertEqual(200, Status).
 
-should_return_ok_for_sec_obj_with_names([Url, _UsersUrl]) ->
+t_return_ok_for_sec_obj_with_names([Url, _UsersUrl]) ->
     SecurityUrl = lists:concat([Url, "/_security"]),
     SecurityProperties = [
         {<<"admins">>, {[{<<"names">>, [<<?TEST_ADMIN>>]}]}},
@@ -385,9 +450,9 @@ should_return_ok_for_sec_obj_with_names([Url, _UsersUrl]) ->
         [?CONTENT_JSON, ?AUTH],
         Body
     ),
-    ?_assertEqual(200, Status).
+    ?assertEqual(200, Status).
 
-should_return_ok_for_sec_obj_with_roles_and_names([Url, _UsersUrl]) ->
+t_return_ok_for_sec_obj_with_roles_and_names([Url, _UsersUrl]) ->
     SecurityUrl = lists:concat([Url, "/_security"]),
     SecurityProperties = [
         {<<"admins">>,
@@ -408,11 +473,9 @@ should_return_ok_for_sec_obj_with_roles_and_names([Url, _UsersUrl]) ->
         [?CONTENT_JSON, ?AUTH],
         Body
     ),
-    ?_assertEqual(200, Status).
+    ?assertEqual(200, Status).
 
-should_return_error_for_sec_obj_with_incorrect_roles_and_names(
-    [Url, _UsersUrl]
-) ->
+t_return_error_for_sec_obj_with_incorrect_roles_and_names([Url, _UsersUrl]) ->
     SecurityUrl = lists:concat([Url, "/_security"]),
     SecurityProperties = [
         {<<"admins">>, {[{<<"names">>, [123]}]}},
@@ -426,18 +489,10 @@ should_return_error_for_sec_obj_with_incorrect_roles_and_names(
         Body
     ),
     ResultJson = ?JSON_DECODE(RespBody),
-    [
-        ?_assertEqual(500, Status),
-        ?_assertEqual(
-            {[
-                {<<"error">>, <<"error">>},
-                {<<"reason">>, <<"no_majority">>}
-            ]},
-            ResultJson
-        )
-    ].
+    ?assertEqual(500, Status),
+    ?assertEqual({[{~"error", ~"error"}, {~"reason", ~"no_majority"}]}, ResultJson).
 
-should_return_error_for_sec_obj_with_incorrect_roles([Url, _UsersUrl]) ->
+t_return_error_for_sec_obj_with_incorrect_roles([Url, _UsersUrl]) ->
     SecurityUrl = lists:concat([Url, "/_security"]),
     SecurityProperties = [
         {<<"admins">>, {[{<<"roles">>, [?TEST_ADMIN]}]}},
@@ -451,18 +506,10 @@ should_return_error_for_sec_obj_with_incorrect_roles([Url, _UsersUrl]) ->
         Body
     ),
     ResultJson = ?JSON_DECODE(RespBody),
-    [
-        ?_assertEqual(500, Status),
-        ?_assertEqual(
-            {[
-                {<<"error">>, <<"error">>},
-                {<<"reason">>, <<"no_majority">>}
-            ]},
-            ResultJson
-        )
-    ].
+    ?assertEqual(500, Status),
+    ?assertEqual({[{~"error", ~"error"}, {~"reason", ~"no_majority"}]}, ResultJson).
 
-should_return_error_for_sec_obj_with_incorrect_names([Url, _UsersUrl]) ->
+t_return_error_for_sec_obj_with_incorrect_names([Url, _UsersUrl]) ->
     SecurityUrl = lists:concat([Url, "/_security"]),
     SecurityProperties = [
         {<<"admins">>, {[{<<"names">>, [<<?TEST_ADMIN>>]}]}},
@@ -476,19 +523,11 @@ should_return_error_for_sec_obj_with_incorrect_names([Url, _UsersUrl]) ->
         Body
     ),
     ResultJson = ?JSON_DECODE(RespBody),
-    [
-        ?_assertEqual(500, Status),
-        ?_assertEqual(
-            {[
-                {<<"error">>, <<"error">>},
-                {<<"reason">>, <<"no_majority">>}
-            ]},
-            ResultJson
-        )
-    ].
+    ?assertEqual(500, Status),
+    ?assertEqual({[{~"error", ~"error"}, {~"reason", ~"no_majority"}]}, ResultJson).
 
-should_return_error_for_sec_obj_in_user_db([_, _UsersUrl]) ->
-    SecurityUrl = lists:concat([_UsersUrl, "/_security"]),
+t_return_error_for_sec_obj_in_user_db([_Url, UsersUrl]) ->
+    SecurityUrl = lists:concat([UsersUrl, "/_security"]),
     SecurityProperties = [
         {<<"admins">>,
             {[
@@ -509,13 +548,11 @@ should_return_error_for_sec_obj_in_user_db([_, _UsersUrl]) ->
         Body
     ),
     ResultJson = ?JSON_DECODE(RespBody),
-    [
-        ?_assertEqual(403, Status),
-        ?_assertEqual(
-            {[
-                {<<"error">>, <<"forbidden">>},
-                {<<"reason">>, <<"You can't edit the security object of the user database.">>}
-            ]},
-            ResultJson
-        )
-    ].
+    ?assertEqual(403, Status),
+    ?assertEqual(
+        {[
+            {~"error", ~"forbidden"},
+            {~"reason", ~"You can't edit the security object of the user database."}
+        ]},
+        ResultJson
+    ).
