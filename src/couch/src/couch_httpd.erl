@@ -180,7 +180,7 @@ start_link(Name, Options) ->
 
 stop() ->
     mochiweb_http:stop(couch_httpd),
-    catch mochiweb_http:stop(https).
+    ?try_catch(fun mochiweb_http:stop/1, [https]).
 
 set_auth_handlers() ->
     AuthenticationHandlers0 = config:get(
@@ -1532,7 +1532,7 @@ log_request_test_() ->
         fun() ->
             ok = meck:new([couch_log]),
             ok = meck:expect(couch_log, error, fun(Fmt, Args) ->
-                case catch io_lib_format:fwrite(Fmt, Args) of
+                case ?try_catch(fun io_lib_format:fwrite/2, [Fmt, Args]) of
                     {'EXIT', Error} -> Error;
                     _ -> ok
                 end

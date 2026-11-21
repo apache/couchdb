@@ -657,7 +657,7 @@ with_ddoc_proc(Db, #doc{id = DDocId, revs = {Start, [DiskRev | _]}} = DDoc, Fun)
             Resp
     catch
         Tag:Err:Stack ->
-            catch proc_stop(Proc),
+            ?try_catch(fun proc_stop/1, [Proc]),
             erlang:raise(Tag, Err, Stack)
     end.
 
@@ -777,12 +777,12 @@ get_ddoc_process(#doc{} = DDoc, DbKey, DDocKey) ->
     case couch_proc_manager:get_proc(DDoc, DbKey, DDocKey) of
         {ok, Proc, {QueryConfig}} ->
             % process knows the ddoc
-            case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
+            case ?try_catch(fun proc_prompt/2, [Proc, [<<"reset">>, {QueryConfig}]]) of
                 true ->
                     proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
                     Proc;
                 _ ->
-                    catch proc_stop(Proc),
+                    ?try_catch(fun proc_stop/1, [Proc]),
                     get_ddoc_process(DDoc, DbKey, DDocKey)
             end;
         Error ->
@@ -792,12 +792,12 @@ get_ddoc_process(#doc{} = DDoc, DbKey, DDocKey) ->
 get_os_process(Lang) ->
     case couch_proc_manager:get_proc(Lang) of
         {ok, Proc, {QueryConfig}} ->
-            case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
+            case ?try_catch(fun proc_prompt/2, [Proc, [<<"reset">>, {QueryConfig}]]) of
                 true ->
                     proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
                     Proc;
                 _ ->
-                    catch proc_stop(Proc),
+                    ?try_catch(fun proc_stop/1, [Proc]),
                     get_os_process(Lang)
             end;
         Error ->
@@ -806,7 +806,7 @@ get_os_process(Lang) ->
 
 ret_os_process(Proc) ->
     true = couch_proc_manager:ret_proc(Proc),
-    catch unlink(Proc#proc.pid),
+    ?try_catch(fun erlang:unlink/1, [Proc#proc.pid]),
     ok.
 
 throw_sum_error(Else) ->

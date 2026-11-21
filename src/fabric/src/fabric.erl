@@ -195,7 +195,7 @@ get_revs_limit(DbName) ->
     try
         couch_db:get_revs_limit(Db)
     after
-        catch couch_db:close(Db)
+        ?try_catch(fun couch_db:close/1, [Db])
     end.
 
 %% @doc update shard property. Some properties like `partitioned` or `hash` are
@@ -265,7 +265,7 @@ get_purge_infos_limit(DbName) ->
     try
         couch_db:get_purge_infos_limit(Db)
     after
-        catch couch_db:close(Db)
+        ?try_catch(fun couch_db:close/1, [Db])
     end.
 
 %% @doc returns purged requests history for the given database
@@ -284,7 +284,7 @@ get_security(DbName, Options) ->
     try
         couch_db:get_security(Db)
     after
-        catch couch_db:close(Db)
+        ?try_catch(fun couch_db:close/1, [Db])
     end.
 
 %% @doc retrieve the security object for all shards of a database

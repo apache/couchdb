@@ -378,7 +378,7 @@ refresh(DbName, DDoc) when is_binary(DbName) ->
 
     case couch_index_server:get_index(couch_mrview_index, DbName, DDoc) of
         {ok, Pid} ->
-            case catch couch_index:get_state(Pid, UpdateSeq) of
+            case ?try_catch(fun couch_index:get_state/2, [Pid, UpdateSeq]) of
                 {ok, _} -> ok;
                 Error -> {error, Error}
             end;
@@ -462,7 +462,7 @@ all_docs_fold(Db, #mrargs{direction = Dir, keys = Keys0} = Args, Callback, UAcc)
         end,
 
     FoldFun = fun(Key, Acc0) ->
-        DocInfo = (catch couch_db:get_doc_info(Db, Key)),
+        DocInfo = ?try_catch(fun couch_db:get_doc_info/2, [Db, Key]),
         {Doc, Acc1} =
             case DocInfo of
                 {ok, #doc_info{id = Id, revs = [RevInfo | _RestRevs]} = DI} ->

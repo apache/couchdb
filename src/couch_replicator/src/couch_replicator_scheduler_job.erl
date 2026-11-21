@@ -111,7 +111,7 @@ stop(Pid) when is_pid(Pid) ->
     % won't return ok but exit the calling process, usually the scheduler, so
     % we guard against that. See:
     %  https://www.erlang.org/doc/apps/stdlib/gen_server.html#stop/3
-    catch gen_server:stop(Pid, shutdown, ?STOP_TIMEOUT_MSEC),
+    ?try_catch(fun gen_server:stop/3, [Pid, shutdown, ?STOP_TIMEOUT_MSEC]),
     exit(Pid, kill),
     receive
         {'DOWN', Ref, _, _, Reason} -> Reason
@@ -329,8 +329,8 @@ handle_info({'EXIT', Pid, normal}, #rep_state{workers = Workers} = State) ->
         %% not clear why a stop was here before
         %%{stop, {unknown_process_died, Pid, normal}, State};
         [] ->
-            catch unlink(State#rep_state.changes_manager),
-            catch exit(State#rep_state.changes_manager, kill),
+            ?try_catch(fun erlang:unlink/1, [State#rep_state.changes_manager]),
+            ?try_catch(fun erlang:exit/2, [State#rep_state.changes_manager, kill]),
             do_last_checkpoint(State);
         Workers2 ->
             {noreply, State#rep_state{workers = Workers2}}
@@ -991,7 +991,7 @@ update_checkpoint(Db, #doc{id = LogId, body = LogBody} = Doc) ->
         end
     catch
         throw:conflict ->
-            case (catch couch_replicator_api_wrap:open_doc(Db, LogId, [ejson_body])) of
+            case ?try_catch(fun couch_replicator_api_wrap:open_doc/3, [Db, LogId, [ejson_body]]) of
                 {ok, #doc{body = LogBody, revs = {Pos, [RevId | _]}}} ->
                     % This means that we were able to update successfully the
                     % checkpoint doc in a previous attempt but we got a connection
@@ -1011,13 +1011,13 @@ commit_to_both(Source, Target) ->
     ParentPid = self(),
     SrcCommitPid = spawn_link(
         fun() ->
-            Result = (catch couch_replicator_api_wrap:ensure_full_commit(Source)),
+            Result = ?try_catch(fun couch_replicator_api_wrap:ensure_full_commit/1, [Source]),
             ParentPid ! {self(), Result}
         end
     ),
 
     % commit tgt sync
-    TargetResult = (catch couch_replicator_api_wrap:ensure_full_commit(Target)),
+    TargetResult = ?try_catch(fun couch_replicator_api_wrap:ensure_full_commit/1, [Target]),
 
     SourceResult =
         receive
@@ -1132,7 +1132,7 @@ get_pending_count(St) ->
 get_pending_count_int(#rep_state{source = #httpdb{} = Db0} = St) ->
     {_, Seq} = St#rep_state.highest_seq_done,
     Db = Db0#httpdb{retries = 3},
-    case (catch couch_replicator_api_wrap:get_pending_count(Db, Seq)) of
+    case ?try_catch(fun couch_replicator_api_wrap:get_pending_count/2, [Db, Seq]) of
         {ok, Pending} ->
             Pending;
         _ ->

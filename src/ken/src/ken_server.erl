@@ -541,7 +541,7 @@ prune_old_entries_test() ->
             ets:new(ken_workers, [named_table, public, {keypos, #job.name}])
         end,
         fun(_) ->
-            catch ets:delete(ken_workers)
+            ?try_catch(fun ets:delete/1, [ken_workers])
         end,
         ?_test(begin
             lists:foreach(

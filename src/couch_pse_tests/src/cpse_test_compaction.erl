@@ -162,7 +162,7 @@ cpse_recompact_updates(Db1) ->
     {ok, Db2} = cpse_util:apply_batch(Db1, Actions1),
 
     {ok, Compactor} = couch_db:start_compact(Db2),
-    catch erlang:suspend_process(Compactor),
+    ?try_catch(fun erlang:suspend_process/1, [Compactor]),
 
     Actions2 = [
         {update, {<<"0001">>, {[{<<"updated">>, true}]}}},
@@ -172,7 +172,7 @@ cpse_recompact_updates(Db1) ->
     {ok, Db3} = cpse_util:apply_actions(Db2, Actions2),
     Term1 = cpse_util:db_as_term(Db3),
 
-    catch erlang:resume_process(Compactor),
+    ?try_catch(fun erlang:resume_process/1, [Compactor]),
     cpse_util:compact(Db3),
 
     {ok, Db4} = couch_db:reopen(Db3),
@@ -200,7 +200,7 @@ cpse_purge_during_compact(Db1) ->
     {ok, Db3} = cpse_util:apply_actions(Db2, Actions3),
 
     {ok, Pid} = couch_db:start_compact(Db3),
-    catch erlang:suspend_process(Pid),
+    ?try_catch(fun erlang:suspend_process/1, [Pid]),
 
     [BarFDI, BazFDI] = couch_db_engine:open_docs(Db3, [<<"bar">>, <<"baz">>]),
     BarRev = cpse_util:prev_rev(BarFDI),
@@ -213,7 +213,7 @@ cpse_purge_during_compact(Db1) ->
     {ok, Db4} = cpse_util:apply_actions(Db3, Actions4),
     Term1 = cpse_util:db_as_term(Db4),
 
-    catch erlang:resume_process(Pid),
+    ?try_catch(fun erlang:resume_process/1, [Pid]),
     cpse_util:compact(Db4),
 
     {ok, Db5} = couch_db:reopen(Db4),
@@ -242,7 +242,7 @@ cpse_multiple_purge_during_compact(Db1) ->
     {ok, Db3} = cpse_util:apply_actions(Db2, Actions3),
 
     {ok, Pid} = couch_db:start_compact(Db3),
-    catch erlang:suspend_process(Pid),
+    ?try_catch(fun erlang:suspend_process/1, [Pid]),
 
     [BarFDI, BazFDI] = couch_db_engine:open_docs(Db3, [<<"bar">>, <<"baz">>]),
     BarRev = cpse_util:prev_rev(BarFDI),
@@ -259,7 +259,7 @@ cpse_multiple_purge_during_compact(Db1) ->
     {ok, Db5} = cpse_util:apply_actions(Db4, Actions5),
     Term1 = cpse_util:db_as_term(Db5),
 
-    catch erlang:resume_process(Pid),
+    ?try_catch(fun erlang:resume_process/1, [Pid]),
     cpse_util:compact(Db5),
 
     {ok, Db6} = couch_db:reopen(Db5),

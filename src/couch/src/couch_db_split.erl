@@ -218,8 +218,8 @@ stop_targets(#{} = Targets) ->
 stop_target_db(Db) ->
     couch_db:close(Db),
     Pid = couch_db:get_pid(Db),
-    catch unlink(Pid),
-    catch exit(Pid, kill),
+    ?try_catch(fun erlang:unlink/1, [Pid]),
+    ?try_catch(fun erlang:exit/2, [Pid, kill]),
     couch_server:unlock(couch_db:name(Db)),
     ok.
 

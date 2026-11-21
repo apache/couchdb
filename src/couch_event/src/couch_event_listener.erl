@@ -11,6 +11,7 @@
 % the License.
 
 -module(couch_event_listener).
+-include_lib("couch/include/couch_db.hrl").
 
 -export([
     start/3,
@@ -81,7 +82,7 @@ cast(Pid, Message) ->
 do_init(Module, Arg, Options) ->
     ok = maybe_name_process(Options),
     ok = register_listeners(Options),
-    case (catch Module:init(Arg)) of
+    case ?try_catch(Module, init, [Arg]) of
         {ok, State} ->
             ?MODULE:loop(#st{module = Module, state = State}, infinity);
         {ok, State, Timeout} when is_integer(Timeout), Timeout >= 0 ->
@@ -125,7 +126,7 @@ register_listeners(Options) ->
     ok.
 
 do_event(#st{module = Module, state = State} = St, DbName, Event) ->
-    case (catch Module:handle_event(DbName, Event, State)) of
+    case ?try_catch(Module, handle_event, [DbName, Event, State]) of
         {ok, NewState} ->
             ?MODULE:loop(St#st{state = NewState}, infinity);
         {ok, NewState, Timeout} when is_integer(Timeout), Timeout >= 0 ->
@@ -137,7 +138,7 @@ do_event(#st{module = Module, state = State} = St, DbName, Event) ->
     end.
 
 do_cast(#st{module = Module, state = State} = St, Message) ->
-    case (catch Module:handle_cast(Message, State)) of
+    case ?try_catch(Module, handle_cast, [Message, State]) of
         {ok, NewState} ->
             ?MODULE:loop(St#st{state = NewState}, infinity);
         {ok, NewState, Timeout} when is_integer(Timeout), Timeout >= 0 ->
@@ -149,7 +150,7 @@ do_cast(#st{module = Module, state = State} = St, Message) ->
     end.
 
 do_info(#st{module = Module, state = State} = St, Message) ->
-    case (catch Module:handle_info(Message, State)) of
+    case ?try_catch(Module, handle_info, [Message, State]) of
         {ok, NewState} ->
             ?MODULE:loop(St#st{state = NewState}, infinity);
         {ok, NewState, Timeout} when is_integer(Timeout), Timeout >= 0 ->
@@ -164,8 +165,8 @@ do_terminate(Reason, #st{module = Module, state = State}) ->
     % Order matters. We want to make sure Module:terminate/1
     % is called even if couch_event:unregister/1 hangs
     % indefinitely.
-    catch Module:terminate(Reason, State),
-    catch couch_event:unregister(self()),
+    ?try_catch(Module, terminate, [Reason, State]),
+    ?try_catch(fun couch_event:unregister/1, [self()]),
     Status =
         case Reason of
             normal -> normal;

@@ -11,6 +11,7 @@
 % the License.
 
 -module(couch_mrview_cleanup).
+-include_lib("couch/include/couch_db.hrl").
 
 -export([
     run/1,
@@ -66,7 +67,9 @@ cleanup_processes(ShardName, #{} = Sigs) when is_binary(ShardName) ->
                 error ->
                     case couch_index_server:shard_index_pid(ShardName, Sig) of
                         {ok, IndexPid} ->
-                            (catch gen_server:cast(IndexPid, {ddoc_updated, {not_found, deleted}}));
+                            ?try_catch(fun gen_server:cast/2, [
+                                IndexPid, {ddoc_updated, {not_found, deleted}}
+                            ]);
                         not_found ->
                             ok
                     end

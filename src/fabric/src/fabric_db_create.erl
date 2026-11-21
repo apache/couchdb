@@ -190,7 +190,7 @@ make_document([#shard{dbname = DbName} | _] = Shards, Suffix, Options) ->
         }
     }.
 
-db_exists(DbName) -> is_list(catch mem3:shards(DbName)).
+db_exists(DbName) -> is_list(?try_catch(fun mem3:shards/1, [DbName])).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
