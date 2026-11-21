@@ -274,6 +274,17 @@ handle_info(
 handle_info({'EXIT', _, {updated, _}}, State) ->
     {noreply, State};
 handle_info(
+    {'EXIT', FromPid, {error, Reason}},
+    #state{
+        index = Index,
+        updater_pid = UpPid,
+        waiting_list = WaitList
+    } = State
+) when FromPid == UpPid ->
+    couch_log:warning("Index for ~p encountered update error ~p", [index_name(Index), Reason]),
+    [gen_server:reply(Pid, {error, Reason}) || {Pid, _} <- WaitList],
+    {noreply, State#state{updater_pid = nil, waiting_list = []}};
+handle_info(
     {'EXIT', FromPid, Reason},
     #state{
         index = Index,
