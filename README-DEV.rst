@@ -247,6 +247,10 @@ target::
 
     make elixir
 
+To run the same tests with gzip response compression enabled::
+
+    make elixir-compression
+
 There is an additional suite for Dreyfus, which is not run
 automatically by either the ``elixir`` or the ``check`` target
 but it could be done manually via the corresponding target::
