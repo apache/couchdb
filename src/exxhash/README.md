@@ -22,7 +22,7 @@ Updating
 xxHash was originally vendored from https://cyan4973.github.io/xxHash/
 with commit SHA f4bef929aa854e9f52a303c5e58fd52855a0ecfa
 
-Updated on 2025-09-17 from commit c961fbe61ad1ee1e430b9c304735a0534fda1c6d
+Updated on 2026-11-22 to release v0.8.4
 
 Only these two files are used from the original library:
   `c_src/xxhash.h`
