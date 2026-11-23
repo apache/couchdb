@@ -1,0 +1,10 @@
+.eunit/
+.rebar/
+_build/
+c_src/*.d
+c_src/*.o
+c_src/snappy/*.d
+c_src/snappy/*.o
+compile_commands.json
+ebin/
+priv/

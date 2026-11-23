@@ -73,7 +73,6 @@ src/parse_trans/
 src/proper/
 src/rebar/
 src/recon/
-src/snappy/
 src/ssl_verify_fun/
 src/triq/
 src/unicode_util_compat/
