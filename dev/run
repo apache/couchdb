@@ -36,8 +36,6 @@ import uuid
 import traceback
 from configparser import ConfigParser
 
-from pbkdf2 import pbkdf2_hex
-
 COMMON_SALT = uuid.uuid4().hex
 
 from urllib.request import *
@@ -1010,7 +1008,9 @@ def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=32):
     >>> hashify(candeira)
     -pbkdf2-99eb34d97cdaa581e6ba7b5386e112c265c5c670,d1d2d4d8909c82c81b6c8184429a0739,10
     """
-    derived_key = pbkdf2_hex(pwd, salt, iterations, keylen, hashfunc=hashlib.sha256)
+    derived_key = hashlib.pbkdf2_hmac(
+        "sha256", pwd.encode(), salt.encode(), iterations, keylen
+    ).hex()
     return "-pbkdf2:sha256-%s,%s,%s" % (derived_key, salt, iterations)
 
 
