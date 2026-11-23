@@ -15,8 +15,7 @@ deps = [
     "src/meck",
     "src/jiffy",
     "src/ibrowse",
-    "src/mochiweb",
-    "src/snappy"
+    "src/mochiweb"
 ]
 # List of OTP application names to exclude from indexing. This can help improve performance by not loading rarely used OTP apps.
 [otp]
