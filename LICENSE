@@ -614,7 +614,7 @@ For the src/ejson/erl_nif_compat.h file
   specific language governing permissions and limitations
   under the License.
 
-For the src/snappy/google-snappy component
+For the src/snappy/c_src/snappy component
 
  Copyright 2005 and onwards Google Inc.
 

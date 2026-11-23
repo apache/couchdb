@@ -117,6 +117,7 @@ SubDirs = [
     "src/couch_log",
     "src/b64url",
     "src/exxhash",
+    "src/snappy",
     "src/ets_lru",
     "src/couch_quickjs",
     "src/chttpd",
@@ -153,9 +154,6 @@ SubDirs = [
 % Try to keep deps in sync with .elp.toml deps
 
 DepDescs = [
-%% Independent Apps
-{snappy,           "snappy",           {tag, "CouchDB-1.0.11"}},
-
 %% %% Non-Erlang deps
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
                    {tag, "v1.3.7"}, [raw]},
