@@ -145,8 +145,13 @@ update_or_delete_index(IndexPid, Db, DI, Proc) ->
                     Fields1 = [list_to_tuple(Field) || Field <- Fields],
                     Fields2 = maybe_add_partition(Db, Id, Fields1),
                     case Fields2 of
-                        [] -> ok = clouseau_rpc:delete(IndexPid, Id);
-                        _ -> ok = clouseau_rpc:update(IndexPid, Id, Fields2)
+                        [] ->
+                            ok = clouseau_rpc:delete(IndexPid, Id);
+                        _ ->
+                            case clouseau_rpc:update(IndexPid, Id, Fields2) of
+                                ok -> ok;
+                                {error, Reason} -> exit({error, Reason})
+                            end
                     end
             end
     end.
