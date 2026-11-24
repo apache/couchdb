@@ -23,56 +23,54 @@
 -include("nouveau.hrl").
 -import(nouveau_util, [index_path/1]).
 
-search(DbName, #index{} = Index, #{} = QueryArgs) ->
-    search(DbName, #index{} = Index, QueryArgs, 0).
-
-search(DbName, #index{} = Index0, QueryArgs0, UpdateLatency) ->
+search(DbName, #index{} = Index0, #{} = QueryArgs) ->
     %% Incorporate the shard name into the record.
     Index1 = Index0#index{dbname = DbName},
 
-    Update = maps:get(update, QueryArgs0, true),
-
-    %% Incorporate min seqs into the query args.
-    QueryArgs1 =
-        case Update of
-            true ->
-                %% get minimum seqs for search
-                {MinUpdateSeq, MinPurgeSeq} = nouveau_index_updater:get_db_info(Index1),
-                QueryArgs0#{
-                    min_update_seq => MinUpdateSeq,
-                    min_purge_seq => MinPurgeSeq
-                };
-            false ->
-                QueryArgs0#{
+    case maps:get(update, QueryArgs, true) of
+        true ->
+            %% get minimum seqs for search
+            {MinUpdateSeq, MinPurgeSeq} = nouveau_index_updater:get_db_info(Index1),
+            %% Incorporate min seqs into the query args.
+            fresh_search(Index1, QueryArgs#{
+                min_update_seq => MinUpdateSeq,
+                min_purge_seq => MinPurgeSeq
+            });
+        false ->
+            case
+                nouveau_api:search(Index1, QueryArgs#{
                     min_update_seq => 0,
                     min_purge_seq => 0
-                }
-        end,
+                })
+            of
+                {ok, Response} ->
+                    rexi:reply({ok, Response#{update_latency => 0}});
+                Else ->
+                    rexi:reply(Else)
+            end
+    end.
 
-    %% Run the search
-    case nouveau_api:search(Index1, QueryArgs1) of
+fresh_search(#index{} = Index, #{} = QueryArgs) ->
+    fresh_search(Index, QueryArgs, 0).
+
+fresh_search(#index{} = Index, #{} = QueryArgs, UpdateLatency) ->
+    case nouveau_api:search(Index, QueryArgs) of
         {ok, Response} ->
-            rexi:reply({ok, Response#{update_latency => UpdateLatency}});
-        {error, stale_index} when Update ->
-            update_and_retry(DbName, Index0, QueryArgs0, UpdateLatency);
-        {error, {not_found, _}} when Update ->
-            update_and_retry(DbName, Index0, QueryArgs0, UpdateLatency);
+            rexi:reply({ok, Response#{update_latency => ms(UpdateLatency)}});
+        {error, stale_index} ->
+            update_and_retry(Index, QueryArgs, UpdateLatency);
+        {error, {not_found, _}} ->
+            update_and_retry(Index, QueryArgs, UpdateLatency);
         Else ->
             rexi:reply(Else)
     end.
 
-update_and_retry(DbName, Index, QueryArgs, UpdateLatency) ->
+update_and_retry(Index, QueryArgs, UpdateLatency) ->
     T0 = erlang:monotonic_time(),
-    case nouveau_index_manager:update_index(Index#index{dbname = DbName}) of
+    case nouveau_index_manager:update_index(Index) of
         ok ->
             T1 = erlang:monotonic_time(),
-            search(
-                DbName,
-                Index,
-                QueryArgs,
-                UpdateLatency +
-                    erlang:convert_time_unit(T1 - T0, native, millisecond)
-            );
+            fresh_search(Index, QueryArgs, UpdateLatency + T1 - T0);
         Else ->
             rexi:reply(Else)
     end.
@@ -87,3 +85,6 @@ info(DbName, #index{} = Index0) ->
         {error, Reason} ->
             rexi:reply({error, Reason})
     end.
+
+ms(NativeTime) ->
+    erlang:convert_time_unit(NativeTime, native, millisecond).
