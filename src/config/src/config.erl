@@ -328,14 +328,14 @@ handle_call({set, Sec, Key, Val, Opts}, _From, Config) ->
     case validate_config_update(Sec, Key, Val) of
         {error, ValidationError} ->
             couch_log:error(
-                "~p: [~s] ~s = ~s rejected for reason ~p",
+                "~p: [~s] ~s = ~0p rejected for reason ~p",
                 [?MODULE, Sec, Key, LogVal, Reason]
             ),
             {reply, {error, ValidationError}, Config};
         ok ->
             put_value(Sec, Key, Val),
             couch_log:notice(
-                "~p: [~s] ~s set to ~s for reason ~p",
+                "~p: [~s] ~s set to ~0p for reason ~p",
                 [?MODULE, Sec, Key, LogVal, Reason]
             ),
             ConfigWriteReturn =
