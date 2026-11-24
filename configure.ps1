@@ -141,8 +141,8 @@ If (-Not $DisableSpiderMonkey) {
     }
 }
 
-$Rebar3Branch = "3.27.0"
-$ErlfmtVersion = "v1.8.0"
+$Rebar3Branch = "3.28.0"
+$ErlfmtVersion = "v1.9.0"
 
 # Translate ./configure variables to CouchDB variables
 $PackageAuthorName = "The Apache Software Foundation"
