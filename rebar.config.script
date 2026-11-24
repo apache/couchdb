@@ -70,24 +70,12 @@ BadErlang = fun(Ver) ->
         "See https://docs.couchdb.org/en/stable/install/unix.html#dependencies~n"
         "for the latest information on dependencies.",
         [Ver]
-    ),
-    case os:getenv("TRAVIS") of
-        "true" ->
-            io:fwrite("Travis run, ignoring bad release. You have been warned!~n"),
-            ok;
-        _ ->
-            halt(1)
-    end
+    )
 end.
 
-% crypto:pbkdf2_hmac/5 was blocking schedulers in
-% versions < 24.3.4.17, < 25.3.2.10 and < 26.2.3
-%
 case VerList of
-    % Leave example around if we have to exlude specific versions
-    % [22, 0, N | _] when N < 5 -> BadErlang(VerString);
-    [25, 3, 2, N | _] when N < 10 -> BadErlang(VerString);
-    [26, 2, N | _] when N < 3 -> BadErlang(VerString);
+    % Leave example around if we have to exclude specific versions
+    %[26, 2, N | _] when N < 3 -> BadErlang(VerString);
     _ -> ok
 end.
 
