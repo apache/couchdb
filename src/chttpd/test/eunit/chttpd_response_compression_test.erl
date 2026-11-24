@@ -48,7 +48,9 @@ compression_test_() ->
                     ?TDEF_FE(t_no_compression_by_default),
                     ?TDEF_FE(t_gzip_when_enabled_and_accepted),
                     ?TDEF_FE(t_no_gzip_below_min_size),
-                    ?TDEF_FE(t_no_gzip_when_enabled_but_not_accepted)
+                    ?TDEF_FE(t_no_gzip_when_enabled_but_not_accepted),
+                    ?TDEF_FE(t_gzip_chunked_via_node_local),
+                    ?TDEF_FE(t_gzip_eventsource_changes)
                 ]
             }
         }
@@ -85,6 +87,31 @@ t_no_gzip_when_enabled_but_not_accepted(Url) ->
     ?assertEqual(200, Code),
     ContentEncoding = proplists:get_value(~"content-encoding", Headers, ~"identity"),
     ?assertNotEqual(~"gzip", ContentEncoding).
+
+t_gzip_chunked_via_node_local(Url) ->
+    ok = config:set("chttpd", "response_compression", "true", false),
+    ShardsDb = ?b2l(mem3_sync:shards_db()),
+    NodeUrl = Url ++ "_node/_local/" ++ ShardsDb ++ "/_all_docs",
+    {ok, Code, Headers, Body} = req_get_raw(NodeUrl, [?AUTH, ?ACCEPT_GZIP]),
+    ?assertEqual(200, Code),
+    ?assertEqual(~"gzip", proplists:get_value(~"content-encoding", Headers)),
+    ?assertEqual(~"chunked", proplists:get_value(~"transfer-encoding", Headers)),
+    #{~"rows" := Rows} = jiffy:decode(zlib:gunzip(Body), [return_maps]),
+    ?assert(is_list(Rows)).
+
+t_gzip_eventsource_changes(Url) ->
+    ok = config:set("chttpd", "response_compression", "true", false),
+    DbUrl = Url ++ ?b2l(?tempdb()),
+    {ok, 201, _, _} = test_request:put(DbUrl, [?CONTENT_JSON, ?AUTH], "{}"),
+    try
+        FeedUrl = DbUrl ++ "/_changes?feed=eventsource&timeout=100",
+        {ok, Code, Headers, Body} = req_get_raw(FeedUrl, [?AUTH, ?ACCEPT_GZIP]),
+        ?assertEqual(200, Code),
+        ?assertEqual(~"gzip", proplists:get_value(~"content-encoding", Headers)),
+        ?assertEqual(~"\n\n", zlib:gunzip(Body))
+    after
+        test_request:delete(DbUrl, [?AUTH])
+    end.
 
 req_get(Url, Headers) ->
     {ok, Code, RespHeaders, Body} = test_request:get(Url, Headers),
