@@ -126,12 +126,10 @@ open(DbName, Options) ->
 
 open_int(DbName, Options0) ->
     Ctx = couch_util:get_value(user_ctx, Options0, #user_ctx{}),
-    case ets:lookup(couch_dbs(DbName), DbName) of
-        [#entry{db = Db0, lock = Lock} = Entry] when Lock =/= locked ->
-            update_lru(DbName, Entry#entry.db_options),
-            {ok, Db1} = couch_db:incref(Db0),
+    case incref_if_open(DbName) of
+        {ok, Db1} ->
             couch_db:set_user_ctx(Db1, Ctx);
-        _ ->
+        not_open ->
             Options = maybe_add_sys_db_callbacks(DbName, Options0),
             Timeout = couch_util:get_value(timeout, Options, infinity),
             Create = couch_util:get_value(create_if_missing, Options, false),
@@ -145,6 +143,28 @@ open_int(DbName, Options0) ->
                 Error ->
                     Error
             end
+    end.
+
+% couch_server can close an idle db between a lookup and incref. It locks the
+% entry for the idle check and removes it before closing the db. But if the
+% entry has the same pid and isn't locked after incref any later check would
+% see our monitor.
+
+incref_if_open(DbName) ->
+    case ets:lookup(couch_dbs(DbName), DbName) of
+        [#entry{db = Db0, pid = Pid, lock = Lock} = Entry] when Lock =/= locked ->
+            update_lru(DbName, Entry#entry.db_options),
+            {ok, Db1} = couch_db:incref(Db0),
+            % Match pid and check that's still not locked one more time
+            case ets:lookup(couch_dbs(DbName), DbName) of
+                [#entry{pid = Pid, lock = Lock1}] when Lock1 =/= locked ->
+                    {ok, Db1};
+                _ ->
+                    ok = couch_db:close(Db1),
+                    not_open
+            end;
+        _ ->
+            not_open
     end.
 
 update_lru(DbName, Options) ->
