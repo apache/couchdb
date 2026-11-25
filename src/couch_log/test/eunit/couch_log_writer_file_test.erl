@@ -41,7 +41,8 @@ couch_log_writer_file_test_() ->
         end,
         fun check_file_write/0,
         fun check_buffered_file_write/0,
-        fun check_reopen/0
+        fun check_reopen/0,
+        fun check_file_extension/0
     ]}.
 
 check_init_terminate() ->
@@ -147,6 +148,33 @@ check_reopen() ->
             {ok, St4} = clear_clock(couch_log_writer_file:maybe_reopen(St3)),
             ?assert(element(3, St4) /= element(3, St2))
     end.
+
+check_file_extension() ->
+    % Make sure we have an empty log for this test
+    IsFile = filelib:is_file("./couch.log"),
+    if
+        not IsFile -> ok;
+        true -> file:delete("./couch.log")
+    end,
+
+    %% remove file extension from config value.
+    config:set("log", "file", "./couch"),
+
+    Entry = #log_entry{
+        level = info,
+        pid = list_to_pid("<0.1.0>"),
+        msg = "stuff",
+        msg_id = "msg_id",
+        time_stamp = "time_stamp"
+    },
+    {ok, St} = ?WRITER:init(),
+    {ok, NewSt} = ?WRITER:write(Entry, St),
+    ok = ?WRITER:terminate(stop, NewSt),
+
+    %% confirm we re-added it.
+    {ok, Data} = file:read_file("./couch.log"),
+    Expect = <<"[info] time_stamp nonode@nohost <0.1.0> msg_id stuff\n">>,
+    ?assertEqual(Expect, Data).
 
 clear_clock({ok, St}) ->
     {ok, clear_clock(St)};
