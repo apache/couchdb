@@ -38,7 +38,7 @@
 -endif.
 
 init() ->
-    FilePath = config:get("log", "file", "./couch.log"),
+    FilePath = filepath(),
     Opts = [append, raw] ++ buffer_opt(),
     case filelib:ensure_dir(FilePath) of
         ok ->
@@ -131,4 +131,11 @@ reopen(St) ->
             % File was moved or deleted
             terminate(rotating, St),
             init()
+    end.
+
+filepath() ->
+    FilePath = config:get("log", "file", "./couch.log"),
+    case filename:extension(FilePath) of
+        ".log" -> FilePath;
+        _ -> FilePath ++ ".log"
     end.
