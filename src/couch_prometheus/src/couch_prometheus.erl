@@ -43,12 +43,13 @@
 scrape() ->
     CouchDB = get_couchdb_stats(),
     System = couch_stats_httpd:to_ejson(get_system_stats()),
+    Plugins = couch_prometheus_plugin:collect(),
     couch_prometheus_util:to_bin(
         lists:map(
             fun(Line) ->
                 io_lib:format("~s~n", [Line])
             end,
-            CouchDB ++ System
+            CouchDB ++ System ++ Plugins
         )
     ).
 

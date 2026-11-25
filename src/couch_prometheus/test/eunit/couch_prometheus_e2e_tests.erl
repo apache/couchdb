@@ -12,6 +12,13 @@
 
 -module(couch_prometheus_e2e_tests).
 
+-behaviour(couch_prometheus_plugin).
+
+% couch_prometheus_plugin callback
+-export([
+    metrics/0
+]).
+
 -include_lib("couch/include/couch_eunit.hrl").
 
 -define(USER, "prometheus_test_admin").
@@ -43,7 +50,10 @@ e2e_test_() ->
                     ?TDEF_FE(t_no_duplicate_metrics),
                     ?TDEF_FE(t_starts_with_couchdb),
                     ?TDEF_FE(t_survives_mem3_sync_termination),
-                    ?TDEF_FE(t_system_stats_metrics_present)
+                    ?TDEF_FE(t_system_stats_metrics_present),
+                    ?TDEF_FE(t_plugin_metrics),
+                    ?TDEF_FE(t_plugin_disabled),
+                    ?TDEF_FE(t_plugin_failures_are_skipped)
                 ]
             }
         }
@@ -86,6 +96,7 @@ setup_prometheus(WithAdditionalPort) ->
         Persist
     ),
     ok = config:set("prometheus", "port", ?PROM_PORT, Persist),
+    ok = config:set("prometheus_plugins", ?MODULE_STRING, "true", Persist),
     % It's already started by default, so restart to pick up config
     ok = application:stop(couch_prometheus),
     ok = application:start(couch_prometheus),
@@ -195,6 +206,61 @@ t_system_stats_metrics_present(Port) ->
     ?assertNotEqual(not_found, metric_value(Stats, "couchdb_database_count")),
     ?assertNotEqual(not_found, metric_value(Stats, "couchdb_ioq_total_requests")),
     ?assertNotEqual(not_found, metric_value(Stats, "couchdb_smoosh_channel_count")).
+
+t_plugin_metrics(Port) ->
+    lists:foreach(
+        fun(P) ->
+            Stats = get_stats(node_local_url(P)),
+            ?assertEqual(42, metric_value(Stats, "couchdb_test_plugin_metric")),
+            ?assertNotEqual(nomatch, string:find(Stats, "# TYPE couchdb_test_plugin_metric gauge"))
+        end,
+        [Port, ?PROM_PORT]
+    ).
+
+t_plugin_disabled(Port) ->
+    Url = node_local_url(Port),
+    try
+        ok = config:set("prometheus_plugins", ?MODULE_STRING, "false", false),
+        ?assertEqual(not_found, metric_value(get_stats(Url), "couchdb_test_plugin_metric"))
+    after
+        ok = config:set("prometheus_plugins", ?MODULE_STRING, "true", false)
+    end,
+    ?assertEqual(42, metric_value(get_stats(Url), "couchdb_test_plugin_metric")).
+
+t_plugin_failures_are_skipped(Port) ->
+    Bad = [
+        {couch_prometheus_missing_plugin, undefined},
+        {couch_prometheus_crash_plugin, fun() -> error(potatoes) end},
+        {couch_prometheus_junk_plugin, fun() -> ["a string", {badness}] end}
+    ],
+    Mods = [Mod || {Mod, Fun} <- Bad, is_function(Fun)],
+    try
+        lists:foreach(
+            fun
+                ({Mod, undefined}) ->
+                    ok = config:set("prometheus_plugins", atom_to_list(Mod), "true", false);
+                ({Mod, Fun}) ->
+                    meck:new(Mod, [non_strict]),
+                    meck:expect(Mod, metrics, Fun),
+                    ok = config:set("prometheus_plugins", atom_to_list(Mod), "true", false)
+            end,
+            Bad
+        ),
+        {ok, RC, _, Stats} = test_request:get(node_local_url(Port), [?CONTENT_JSON, ?AUTH]),
+        ?assertEqual(200, RC),
+        % We did call the bad ones
+        [?assert(meck:called(Mod, metrics, [])) || Mod <- Mods],
+        % Core metrics are there we didn't break all the things (tm)
+        ?assertNotEqual(not_found, metric_value(Stats, "couchdb_uptime_seconds")),
+        ?assertEqual(42, metric_value(Stats, "couchdb_test_plugin_metric"))
+    after
+        [config:delete("prometheus_plugins", atom_to_list(Mod), false) || {Mod, _} <- Bad],
+        meck:unload(Mods)
+    end.
+
+metrics() ->
+    Instance = {[{source, ~"plugin"}], 42},
+    couch_prometheus_util:to_prom(test_plugin_metric, gauge, "test plugin metric", Instance).
 
 node_local_url(Port) ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),

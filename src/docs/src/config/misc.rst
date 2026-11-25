@@ -413,3 +413,18 @@ Configuration of Prometheus Endpoint
 
             [prometheus]
             port = 17986
+
+.. config:section:: prometheus_plugins :: Enable Prometheus Plugins
+
+    .. config:option:: {plugin}
+
+        .. versionadded:: 3.6
+
+        Which plugins are enabled. A plugin is an Erlang module implementing
+        the ``couch_prometheus_plugin`` behavior. Metrics returned by enabled
+        plugins are added to the output of the ``_prometheus`` endpoint both
+        the clustered port and the additional port. By default not extra plugins
+        are enabled. ::
+
+            [prometheus_plugins]
+            my_plugin_module = true
