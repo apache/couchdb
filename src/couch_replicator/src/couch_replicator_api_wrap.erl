@@ -179,7 +179,11 @@ get_missing_revs(#httpdb{} = Db, IdRevs) ->
             {method, post},
             {path, "_revs_diff"},
             {body, Body},
-            {headers, [{"Content-Type", "application/json"} | ExtraHeaders]}
+            {headers, [
+                {"Content-Type", "application/json"},
+                {"Accept-Encoding", "gzip"}
+                | ExtraHeaders
+            ]}
         ],
         fun
             (200, _, {Props}) ->
@@ -222,7 +226,8 @@ bulk_get(#httpdb{} = Db, #{} = IdRevs, Options) ->
         {body, ReqBody},
         {headers, [
             {"Content-Type", "application/json"},
-            {"Accept", "application/json"}
+            {"Accept", "application/json"},
+            {"Accept-Encoding", "gzip"}
             | ExtraHeaders
         ]}
     ],
@@ -507,7 +512,8 @@ update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
     end,
     Headers0 = [
         {"Content-Type", "application/json"},
-        {"X-Couch-Full-Commit", FullCommit}
+        {"X-Couch-Full-Commit", FullCommit},
+        {"Accept-Encoding", "gzip"}
     ],
     {Body, Headers} =
         case should_compress_request(HttpDb, Len) of
