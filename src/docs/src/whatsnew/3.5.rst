@@ -25,12 +25,113 @@
 Version 3.5.4
 =============
 
-* Remove support for bare source and target databases to
-  ``_replicate`` endpoint.
+Features
+--------
 
-* As part of the deprecation of the ``_rewrite`` handler, rewrites are
-  now disabled by default. They can be re-enabled by setting
-  ``[chttpd] enable_rewrites = true`` in config.
+* :ghissue:`6190`: The ``_replicate`` endpoint accept only full URLs.
+* :ghissue:`6227`: As part of the deprecation of the ``_rewrite`` handler,
+  rewrites are now disabled by default. They can be re-enabled by setting
+  ``[chttpd] enable_rewrites = true``.
+* :ghissue:`6221`: The default ``[chttpd] max_http_request_size`` is lowered
+  from 4GB to 2GB.
+* :ghissue:`6229`: Only admins can write to ``_users`` with ``new_edits=false``.
+* :ghissue:`6174`: The ``stem_interactive_updates`` setting is
+  removed. Rev trees are always stemmed on interactive updates.
+* :ghissue:`6240`: The ``[log] file`` path always ends in ``.log``. The
+  extension is appended if the configured value does not have it.
+* :ghissue:`6165`, :ghissue:`6176`: New ``heartbeat_seq`` parameter for
+  ``_changes`` feeds. With ``heartbeat_seq=true`` heartbeats include the
+  current update sequence, so clients reading feeds with very selective
+  filters can checkpoint their progress. The replicator uses it when the
+  source supports it.
+* :ghissue:`6171`: Nouveau no longer marked as experimental.
+* :ghissue:`6189`, :ghissue:`6191`: Nouveau: enable connection keepalive by
+  default. Adds the ``[nouveau] keepalive_msec`` setting.
+* :ghissue:`6114`: Check that the end of file position tracked by
+  ``couch_file`` matches the actual end of the file before writing a header.
+  Enabled by default, can be disabled with ``[couchdb] validate_eof = false``.
+
+Performance
+-----------
+
+* :ghissue:`6169`, :ghissue:`6206`: Speed up the internal replicator. Remove a
+  quadratic revision lookup and read document bodies in batches. Copying
+  shards with many small documents is about 1.4x faster.
+* :ghissue:`6209`, :ghissue:`6213`, :ghissue:`6214`: Speed up shard splitting
+  by batching document body reads and writes. Splitting shards with many small
+  documents is up to 2x faster.
+* :ghissue:`6232`: Update snappy to ``1.3.1`` and build it in-tree. Small
+  terms compress and decompress about 3x faster. The format did not change,
+  so existing files and mixed version clusters are not affected.
+* :ghissue:`6233`: Update Jiffy to ``2.1.0``. Encoding and decoding is 10-15%
+  faster on average and about 4x faster for small objects.
+
+Bugfixes
+--------
+
+* :ghissue:`6168`: Fix revision path patching for replicated revisions which
+  already exist on the target. Previously, targets with and without a
+  validation function could end up with different revision trees if the
+  sources had different ``revs_limit`` values.
+* :ghissue:`6174`, :ghissue:`6179`, :ghissue:`6195`, :ghissue:`6203`: Make
+  revision tree merging and stemming more robust. Always stem interactive
+  updates, collapse duplicate revisions before stemming, stem trees with
+  duplicates the same way as trees without them and handle a replicated
+  revision which arrives with a different parent.
+* :ghissue:`6163`: Stop ``_changes`` feeds with a ``limit`` and a filter from
+  skipping over rows.
+* :ghissue:`6164`: Fix heartbeat timing for continuous ``_changes`` feeds.
+  Heartbeats are sent only if nothing else was sent during the heartbeat
+  interval.
+* :ghissue:`6217`: Fix ``eventsource`` ``_changes`` feeds ending the response
+  before the final newline was sent.
+* :ghissue:`6177`: Count ``missing_stub`` errors from individual shard copies
+  towards the write quorum.
+* :ghissue:`6159`: Fix more spurious ``500`` errors during db deletion.
+* :ghissue:`6184`: Avoid database and view index files auto-closing while they
+  are being initialized.
+* :ghissue:`6193`: Persist the purge infos limit as soon as it is set.
+* :ghissue:`6200`: Recompute the deleted flag after purging, such that document
+  and deleted document counts are correct. Existing documents are repaired
+  during compaction.
+* :ghissue:`6210`: Fix stuck ``mem3`` purge checkpoints.
+* :ghissue:`6205`: Reset the request body read time after handling each
+  request on a keep-alive connection.
+* :ghissue:`6241`: Reduce spurious ``noproc`` errors logged when database
+  handles are closed under LRU pressure.
+* :ghissue:`6186`, :ghissue:`6187`, :ghissue:`6188`: Validate redirect
+  locations. Requests using ``_design%2F{name}`` paths are handled directly
+  instead of being redirected.
+* :ghissue:`6212`: Tell caches not to store ``_session`` responses.
+* :ghissue:`6220`: Tighten replicator options and term decoding.
+* :ghissue:`6223`: Limit the ``couchjs`` line length to the
+  JS string length limit. Longer lines are an explicit error.
+* :ghissue:`6224`: Improve the replicator document ownership check. All the
+  leaf revisions are checked, also for ``new_edits=false`` updates.
+* :ghissue:`6237`, :ghissue:`6239`: Log config values as presented in the
+  request. Treat ``[jwt_keys]`` and ``[nouveau] ssl_password`` as sensitive
+  values.
+* :ghissue:`6225`: Search: stop the indexer and return the error to waiting
+  clients when an index update fails.
+* :ghissue:`6185`, :ghissue:`6194`, :ghissue:`6197`: Nouveau: fix index
+  cleanup after dbs are deleted.
+* :ghissue:`6235`: Nouveau: with ``update=true`` only block a search until
+  the index is as fresh as the database was when the search started.
+* :ghissue:`6160`: Nouveau: update Lucene to ``10.5.2``.
+* :ghissue:`6219`: Nouveau: update Dropwizard to ``5.0.2``. The index name is
+  now sent to the Nouveau server as a query parameter instead of in the URL
+  path, and the deprecated single document update endpoints are removed.
+  CouchDB detects which form the Nouveau server expects, so it also works with
+  a Nouveau server that has not been upgraded yet.
+* :ghissue:`6222`: Update MochiWeb to ``3.6.1``.
+* :ghissue:`6243`: Update Gun to ``2.8.0`` and Cowlib to ``2.22.0``.
+* :ghissue:`6230`: Update xxHash to ``0.8.4``. Hash values are unchanged.
+
+Tests/CI/Builds
+---------------
+
+* :ghissue:`6136`: Fix the disk monitor test on nearly empty disks.
+* :ghissue:`6234`: Update rebar3 to ``3.28.0`` and erlfmt to ``1.9.0``.
 
 .. _release/3.5.3:
 
