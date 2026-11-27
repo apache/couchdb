@@ -15,6 +15,7 @@
 -module(dreyfus_index_manager).
 -behaviour(gen_server).
 -include("dreyfus.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -define(BY_SIG, dreyfus_by_sig).
 -define(BY_PID, dreyfus_by_pid).
@@ -131,7 +132,7 @@ handle_db_event(_DbName, _Event, _St) ->
     {ok, nil}.
 
 new_index(DbName, #index{sig = Sig} = Index) ->
-    case (catch dreyfus_index:start_link(DbName, Index)) of
+    case ?try_catch(fun dreyfus_index:start_link/2, [DbName, Index]) of
         {ok, NewPid} ->
             Msg = {open_ok, DbName, Sig, NewPid},
             ok = gen_server:call(?MODULE, Msg, infinity),

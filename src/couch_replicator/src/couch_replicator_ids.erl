@@ -51,7 +51,7 @@ replication_id(#rep{} = Rep, 3) ->
 replication_id(#rep{} = Rep, 2) ->
     {ok, HostName} = inet:gethostname(),
     Port =
-        case (catch mochiweb_socket_server:get(couch_httpd, port)) of
+        case ?try_catch(fun mochiweb_socket_server:get/2, [couch_httpd, port]) of
             P when is_number(P) ->
                 P;
             _ ->

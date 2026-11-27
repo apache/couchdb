@@ -21,6 +21,7 @@
 %% Renamed to couch_log_format to avoid naming collision with
 %% lager_Format.
 -module(couch_log_trunc_io_fmt).
+-include_lib("couch/include/couch_db.hrl").
 
 -export([format/3, format/4]).
 
@@ -288,7 +289,7 @@ cdata_to_chars([I | Cs]) ->
 cdata_to_chars([]) ->
     [];
 cdata_to_chars(B) when is_binary(B) ->
-    case catch unicode:characters_to_list(B) of
+    case ?try_catch(fun unicode:characters_to_list/1, [B]) of
         L when is_list(L) -> L;
         _ -> binary_to_list(B)
     end.

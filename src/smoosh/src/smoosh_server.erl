@@ -13,6 +13,7 @@
 -module(smoosh_server).
 -behaviour(gen_server).
 -behaviour(config_listener).
+-include_lib("couch/include/couch_db.hrl").
 
 % public api.
 -export([
@@ -256,7 +257,7 @@ handle_info(_Msg, State) ->
     {noreply, State}.
 
 terminate(_Reason, #state{access_cleaner = CPid}) ->
-    catch unlink(CPid),
+    ?try_catch(fun erlang:unlink/1, [CPid]),
     exit(CPid, kill),
     Fun = fun(#channel{pid = P}, _) ->
         smoosh_channel:close(P)

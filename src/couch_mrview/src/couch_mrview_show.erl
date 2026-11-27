@@ -28,7 +28,7 @@
 % then it sends the response from the query server to the http client.
 
 maybe_open_doc(Db, DocId) ->
-    case catch couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
+    case ?try_catch(fun couch_httpd_db:couch_doc_open/4, [Db, DocId, nil, [conflicts]]) of
         #doc{} = Doc -> Doc;
         {not_found, _} -> nil
     end.

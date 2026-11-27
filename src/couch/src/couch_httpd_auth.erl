@@ -373,7 +373,7 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                                 "timeout", 600
                             ),
                             couch_log:debug("timeout ~p", [Timeout]),
-                            case (catch list_to_integer(TimeStr, 16)) of
+                            case ?try_catch(fun list_to_integer/2, [TimeStr, 16]) of
                                 TimeStamp when CurrentTime < TimeStamp + Timeout ->
                                     case
                                         couch_secrets:verify(

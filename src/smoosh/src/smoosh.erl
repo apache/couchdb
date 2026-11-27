@@ -44,7 +44,7 @@ enqueue_all_dbs() ->
 enqueue_all_views() ->
     fold_local_shards(
         fun(#shard{name = Name}, _Acc) ->
-            catch enqueue_views(Name)
+            ?try_catch(fun enqueue_views/1, [Name])
         end,
         ok
     ).

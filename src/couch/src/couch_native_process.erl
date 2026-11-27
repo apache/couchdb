@@ -194,9 +194,9 @@ run(State, [<<"reduce">>, Funs, KVs, _Ctx]) ->
         ),
     Keys2 = lists:reverse(Keys),
     Vals2 = lists:reverse(Vals),
-    {State, catch reduce(State, Funs, Keys2, Vals2, false)};
+    {State, ?try_catch(fun reduce/5, [State, Funs, Keys2, Vals2, false])};
 run(State, [<<"rereduce">>, Funs, Vals, _Ctx]) ->
-    {State, catch reduce(State, Funs, null, Vals, true)};
+    {State, ?try_catch(fun reduce/5, [State, Funs, null, Vals, true])};
 run(#evstate{ddocs = DDocs} = State, [<<"ddoc">>, <<"new">>, DDocId, DDoc]) ->
     DDocs2 = store_ddoc(DDocs, DDocId, DDoc),
     {State#evstate{ddocs = DDocs2}, true};
@@ -226,12 +226,12 @@ ddoc(State, {DDoc}, [FunPath, Args]) ->
     ddoc(State, makefun(State, BFun, {DDoc}), FunPath, Args).
 
 ddoc(State, {_, Fun}, [<<"validate_doc_update">>], Args) ->
-    {State, (catch apply(Fun, Args))};
+    {State, ?try_catch(Fun, Args)};
 ddoc(State, {_, Fun}, [<<"rewrites">>], Args) ->
-    {State, (catch apply(Fun, Args))};
+    {State, ?try_catch(Fun, Args)};
 ddoc(State, {_, Fun}, [<<"filters">> | _], [Docs, Req]) ->
     FilterFunWrapper = fun(Doc) ->
-        case catch Fun(Doc, Req) of
+        case ?try_catch(Fun, [Doc, Req]) of
             true -> true;
             false -> false;
             {'EXIT', Error} -> couch_log:error("~p", [Error])
@@ -241,7 +241,7 @@ ddoc(State, {_, Fun}, [<<"filters">> | _], [Docs, Req]) ->
     {State, [true, Resp]};
 ddoc(State, {_, Fun}, [<<"views">> | _], [Docs]) ->
     MapFunWrapper = fun(Doc) ->
-        case catch Fun(Doc) of
+        case ?try_catch(Fun, [Doc]) of
             undefined -> true;
             ok -> false;
             false -> false;
@@ -253,7 +253,7 @@ ddoc(State, {_, Fun}, [<<"views">> | _], [Docs]) ->
     {State, [true, Resp]};
 ddoc(State, {_, Fun}, [<<"shows">> | _], Args) ->
     Resp =
-        case (catch apply(Fun, Args)) of
+        case ?try_catch(Fun, Args) of
             FunResp when is_list(FunResp) ->
                 FunResp;
             {FunResp} ->
@@ -264,7 +264,7 @@ ddoc(State, {_, Fun}, [<<"shows">> | _], Args) ->
     {State, Resp};
 ddoc(State, {_, Fun}, [<<"updates">> | _], Args) ->
     Resp =
-        case (catch apply(Fun, Args)) of
+        case ?try_catch(Fun, Args) of
             [JsonDoc, JsonResp] ->
                 [<<"up">>, JsonDoc, JsonResp]
         end,
@@ -272,7 +272,7 @@ ddoc(State, {_, Fun}, [<<"updates">> | _], Args) ->
 ddoc(State, {Sig, Fun}, [<<"lists">> | _], Args) ->
     Self = self(),
     SpawnFun = fun() ->
-        LastChunk = (catch apply(Fun, Args)),
+        LastChunk = ?try_catch(Fun, Args),
         case start_list_resp(Self, Sig) of
             started ->
                 receive
@@ -394,7 +394,7 @@ makefun(_State, Source, BindFuns) when is_list(BindFuns) ->
     FunStr = binary_to_list(Source),
     {ok, Tokens, _} = erl_scan:string(FunStr),
     Form =
-        case (catch erl_parse:parse_exprs(Tokens)) of
+        case ?try_catch(fun erl_parse:parse_exprs/1, [Tokens]) of
             {ok, [ParsedForm]} ->
                 ParsedForm;
             {error, {LineNum, _Mod, [Mesg, Params]}} = Error ->
@@ -435,7 +435,7 @@ foldrows(GetRow, ProcRow, Acc) ->
         nil ->
             {ok, Acc};
         Row ->
-            case (catch ProcRow(Row, Acc)) of
+            case ?try_catch(ProcRow, [Row, Acc]) of
                 {ok, Acc2} ->
                     foldrows(GetRow, ProcRow, Acc2);
                 {stop, Acc2} ->

@@ -361,7 +361,7 @@ handle_info(maybe_close, State) ->
 handle_info({'DOWN', _, _, _Pid, _}, #st{mod = Mod, idx_state = IdxState} = State) ->
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
     couch_log:debug("Index shutdown by monitor notice for db: ~s idx: ~s", Args),
-    catch send_all(State#st.waiters, shutdown),
+    ?try_catch(fun send_all/2, [State#st.waiters, shutdown]),
     {stop, normal, State#st{waiters = []}}.
 
 maybe_restart_updater(#st{waiters = []}) ->

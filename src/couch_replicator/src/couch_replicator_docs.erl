@@ -267,7 +267,7 @@ before_doc_update_owner(Name, Name, Db, #doc{} = Doc) ->
     ok = check_stored_owner(Name, Db, Doc),
     Doc;
 before_doc_update_owner(Other, Name, Db, #doc{body = {Body}} = Doc) ->
-    case (catch couch_db:check_is_admin(Db)) of
+    case ?try_catch(fun couch_db:check_is_admin/1, [Db]) of
         ok when Other =:= null ->
             Doc#doc{body = {?replace(Body, ?OWNER, Name)}};
         ok ->
@@ -301,7 +301,7 @@ after_doc_read(#doc{body = {Body}} = Doc, Db) ->
     IsReplicator = lists:member(?REPLICATOR_ROLE, Roles),
     % Internal replicator opens dbs with the ?ADMIN_CTX macro
     IsInternalRepl = (Ctx == ?ADMIN_USER),
-    case (catch couch_db:check_is_admin(Db)) of
+    case ?try_catch(fun couch_db:check_is_admin/1, [Db]) of
         ok ->
             Doc;
         _ ->

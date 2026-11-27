@@ -227,7 +227,7 @@ handle_design_req(
 ) ->
     case couch_db:is_system_db(Db) of
         true ->
-            case (catch couch_db:check_is_admin(Db)) of
+            case ?try_catch(fun couch_db:check_is_admin/1, [Db]) of
                 ok ->
                     ok;
                 _ ->
@@ -307,7 +307,7 @@ do_db_req(#httpd{user_ctx = UserCtx, path_parts = [DbName | _]} = Req, Fun) ->
             try
                 Fun(Req, Db)
             after
-                catch couch_db:close(Db)
+                ?try_catch(fun couch_db:close/1, [Db])
             end;
         Error ->
             throw(Error)
@@ -855,7 +855,7 @@ update_doc(Req, Db, DocId, #doc{deleted = Deleted} = Doc, Headers, UpdateType) -
         "ok" ->
             % async batching
             spawn(fun() ->
-                case catch (couch_db:update_doc(Db, Doc, Options, UpdateType)) of
+                case ?try_catch(fun couch_db:update_doc/4, [Db, Doc, Options, UpdateType]) of
                     {ok, _} -> ok;
                     Error -> couch_log:info("Batch doc error (~s): ~p", [DocId, Error])
                 end

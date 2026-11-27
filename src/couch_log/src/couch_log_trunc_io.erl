@@ -36,6 +36,7 @@
 -module(couch_log_trunc_io).
 -author('matthias@corelatus.se').
 %% And thanks to Chris Newcombe for a bug fix
+-include_lib("couch/include/couch_db.hrl").
 
 % interface functions
 -export([format/3, format/4, print/2, print/3, fprint/2, fprint/3, safe/2]).
@@ -96,7 +97,7 @@ fprint(T, Max, Options) ->
 %%
 -spec safe(term(), pos_integer()) -> {string(), pos_integer()} | {string()}.
 safe(What, Len) ->
-    case catch print(What, Len) of
+    case ?try_catch(fun couch_log_trunc_io:print/2, [What, Len]) of
         {L, Used} when is_list(L) -> {L, Used};
         _ -> {"unable to print" ++ io_lib:write(What, 99)}
     end.

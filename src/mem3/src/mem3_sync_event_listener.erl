@@ -26,6 +26,7 @@
 ]).
 
 -include_lib("mem3/include/mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -ifdef(TEST).
 -define(RELISTEN_DELAY, 500).
@@ -298,7 +299,7 @@ should_terminate(Pid) ->
         ?assert(is_process_alive(Pid)),
 
         EventMgr = whereis(config_event),
-        EventMgrWasAlive = (catch is_process_alive(EventMgr)),
+        EventMgrWasAlive = ?try_catch(fun erlang:is_process_alive/1, [EventMgr]),
 
         Ref = monitor(process, Pid),
 

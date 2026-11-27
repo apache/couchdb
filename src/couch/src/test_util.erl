@@ -160,8 +160,8 @@ stop_sync(Pid, Fun, Timeout) when is_function(Fun) and is_pid(Pid) ->
     MRef = monitor(process, Pid),
     try
         begin
-            catch unlink(Pid),
-            Res = (catch Fun()),
+            ?try_catch(fun erlang:unlink/1, [Pid]),
+            Res = ?try_catch(Fun, []),
             receive
                 {'DOWN', MRef, _, _, _} ->
                     Res
@@ -269,8 +269,8 @@ with_processes_restart(Names, Fun, Timeout, Delay) ->
         [],
         Names
     ),
-    [catch unlink(Pid) || {_, Pid} <- Processes],
-    Res = (catch Fun()),
+    [?try_catch(fun erlang:unlink/1, [Pid]) || {_, Pid} <- Processes],
+    Res = ?try_catch(Fun, []),
     {wait_start(Processes, Timeout, Delay), Res}.
 
 wait_start(Processses, TimeoutInSec, Delay) ->
