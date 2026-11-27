@@ -366,6 +366,7 @@ def generateNativeStage(platform) {
                   retry (3) {sh "$MAKE ${meta[platform].gnu_make_eunit_opts} eunit" }
                   if (meta[platform].quickjs_test262) {retry(3) {sh "$MAKE quickjs-test262"}}
                   retry (3) {sh "$MAKE elixir"}
+                  retry (3) {sh "$MAKE elixir-compression"}
                   retry (3) {timeout(time: 5, unit: "MINUTES") {sh "$MAKE elixir-search ERLANG_COOKIE=crumbles"}}
                   retry (3) {timeout(time: 5, unit: "MINUTES") {sh "$MAKE mango-test ERLANG_COOKIE=crumbles"}}
                   retry (3) {sh "$MAKE weatherreport-test"}
@@ -537,6 +538,7 @@ def generateContainerStage(platform) {
                     retry (3) {sh "make ${meta[platform].gnu_make_eunit_opts} eunit" }
                     if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                     retry(3) {sh 'make elixir'}
+                    retry(3) {sh 'make elixir-compression'}
                     writeFile(file: 'clouseau/clouseau.conf', text: containerClouseauConfig)
                     retry(3) {sh "${setClouseauJavaHome}timeout 5m make elixir-search ERLANG_COOKIE=crumbles"}
                     retry(3) {sh "${setClouseauJavaHome}timeout 5m make mango-test ERLANG_COOKIE=crumbles"}

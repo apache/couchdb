@@ -147,15 +147,16 @@ defmodule Couch.DBTest do
 
   def create_user(user) do
     user_doc = prepare_user_doc(user)
+    Couch.put("/_users")
     resp = Couch.get("/_users/#{user_doc["_id"]}")
 
     user_doc =
       case resp.status_code do
-        404 ->
-          user_doc
-
         sc when sc >= 200 and sc < 300 ->
           Map.put(user_doc, "_rev", resp.body["_rev"])
+
+        _ ->
+          user_doc
       end
 
     resp = Couch.post("/_users", body: user_doc)

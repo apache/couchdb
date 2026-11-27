@@ -163,6 +163,7 @@ check: all
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
+	@$(MAKE) elixir-compression
 	@$(MAKE) elixir-search
 	@$(MAKE) weatherreport-test
 	@$(MAKE) nouveau-test
@@ -253,6 +254,19 @@ elixir: elixir-init devclean
 		--enable-erlang-views \
 		--no-join \
 		--locald-config test/elixir/test/config/test-config.ini \
+		--erlang-config rel/files/eunit.config \
+		--no-eval 'mix test --max-failures 1 --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
+
+.PHONY: elixir-compression
+# target: elixir-compression - Run Elixir-based integration tests with response compression enabled
+elixir-compression: export MIX_ENV=integration
+elixir-compression: export EX_ACCEPT_GZIP=true
+elixir-compression: elixir-init devclean
+	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass \
+		--enable-erlang-views \
+		--no-join \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--locald-config test/elixir/test/config/compression.ini \
 		--erlang-config rel/files/eunit.config \
 		--no-eval 'mix test --max-failures 1 --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 

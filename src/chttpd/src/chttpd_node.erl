@@ -216,6 +216,9 @@ recv_loop(Ref, ReqResp) ->
         {Ref, Code, Headers, chunked, respond} ->
             Resp = ReqResp:respond({Code, Headers, chunked}),
             recv_loop(Ref, Resp);
+        {Ref, Code, Headers, {chunked, _Codec} = Args, respond} ->
+            Resp = ReqResp:respond({Code, Headers, Args}),
+            recv_loop(Ref, Resp);
         {Ref, Code, Headers, Args, respond} ->
             Resp = ReqResp:respond({Code, Headers, Args}),
             {ok, Resp};
