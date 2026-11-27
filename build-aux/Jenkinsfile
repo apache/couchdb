@@ -613,6 +613,8 @@ pipeline {
 
   options {
     buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '10'))
+    // New builds stop older builds on same pr/branch
+    disableConcurrentBuilds(abortPrevious: true)
     preserveStashes(buildCount: 10)
     timeout(time: 4, unit: 'HOURS')
     timestamps()
@@ -728,8 +730,8 @@ pipeline {
       }
       steps {
         script {
-          // Including failFast: true in map fails the build immediately if any parallel step fails
-          parallelStagesMap = meta.collectEntries( [failFast: false] ) { key, values ->
+          // failFast for PRs since they have CHANGE_ID set. We want to save worker. Main runs as is
+          parallelStagesMap = meta.collectEntries( [failFast: env.CHANGE_ID != null] ) { key, values ->
             if (values.image) {
               ["${key}": generateContainerStage(key)]
             }
