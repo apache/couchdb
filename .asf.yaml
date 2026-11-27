@@ -1,4 +1,4 @@
-# see https://cwiki.apache.org/confluence/display/INFRA/git+-+.asf.yaml+features#git.asf.yamlfeatures-GitHubsettings
+# see https://github.com/apache/infrastructure-asfyaml/blob/main/README.md
 
 github:
   description: "Seamless multi-primary syncing database with an intuitive HTTP/JSON API, designed for reliability"
@@ -22,9 +22,12 @@ github:
     squash: true
     rebase: true
     merge: true
-  del_branch_on_merge: true
   copilot_code_review:
     enabled: false
+  pull_requests:
+    allow_auto_merge: true
+    allow_update_branch: true
+    del_branch_on_merge: true
   protected_branches:
     main:
       required_status_checks:
