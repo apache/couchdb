@@ -38,6 +38,21 @@ rm quickjs/repl.js
 rm quickjs/qjs.c
 rm quickjs/TODO
 rm quickjs/readme-cosmo.txt
+# Skip Temporal and Intl bits. We'll add them later perhaps
+# rebar.config.script builds with CONFIG_TEMPORAL_INTL= (off)
+rm -rf quickjs/intl
+rm -rf quickjs/temporal
+rm quickjs/gen-locale-data.js
+rm quickjs/gen_tzdata.py
+
+echo
+echo " * skip temporal and intl support for now in test262.conf"
+awk '
+    /^(Temporal|Intl[-.]|intl-)/ && !/=/ { print $0 "=skip"; next }
+    { print }
+    /^\[exclude\]$/ { print "test262/test/intl402/" }
+' quickjs/test262.conf > quickjs/test262.conf.tmp
+mv quickjs/test262.conf.tmp quickjs/test262.conf
 
 echo
 echo " * apply patches"
@@ -53,3 +68,9 @@ echo
 #  ./update_patches.sh
 # OR manually run after cloning and unzipping master.zip from quickjs:
 #  diff -u quickjs-master/quickjs.c quickjs/quickjs.c > patches/01-spidermonkey-185-mode.patch
+#  diff -u quickjs-master/test262_errors.txt quickjs/test262_errors.txt > patches/02-test262-errors.patch
+#
+# To run test262 from the quickjs directory use:
+#  make CONFIG_TEMPORAL_INTL= test2-bootstrap
+#  make CONFIG_TEMPORAL_INTL= test2
+# and "make CONFIG_TEMPORAL_INTL= test2-update" to regenerate test262_errors.txt

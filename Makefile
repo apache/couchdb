@@ -352,8 +352,8 @@ weatherreport-test: devclean escriptize
 .PHONY: quickjs-test262
 # target: quickjs-javascript-tests - Run QuickJS JS conformance tests
 quickjs-test262: couch-core
-	make -C src/couch_quickjs/quickjs test2-bootstrap
-	make -C src/couch_quickjs/quickjs test2
+	make -C src/couch_quickjs/quickjs CONFIG_TEMPORAL_INTL= test2-bootstrap
+	make -C src/couch_quickjs/quickjs CONFIG_TEMPORAL_INTL= test2
 
 ################################################################################
 # Developing

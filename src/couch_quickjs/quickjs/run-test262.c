@@ -328,7 +328,7 @@ char *skip_prefix(const char *str, const char *prefix)
 
 char *get_basename(const char *filename)
 {
-    char *p;
+    const char *p;
 
     p = strrchr(filename, '/');
     if (!p)
@@ -579,6 +579,35 @@ static JSValue js_evalScript(JSContext *ctx, JSValue this_val,
     return ret;
 }
 
+/* use JS_ToString() so that Test262Errors are correctly displayed */
+static void js_dump_obj(JSContext *ctx, FILE *f, JSValueConst val)
+{
+    const char *str;
+
+    str = JS_ToCString(ctx, val);
+    if (str) {
+        fprintf(f, "%s\n", str);
+        JS_FreeCString(ctx, str);
+    } else {
+        fprintf(f, "[exception]\n");
+    }
+}
+
+static void test262_dump_error(JSContext *ctx)
+{
+    JSValue exception_val;
+
+    exception_val = JS_GetException(ctx);
+    if (JS_IsError(ctx, exception_val)) {
+        JS_PrintValue(ctx, js_print_value_write, stderr, exception_val, NULL);
+        fputc('\n', stderr);
+    } else {
+        js_dump_obj(ctx, stderr, exception_val);
+    }
+    JS_FreeValue(ctx, exception_val);
+}
+
+
 static JSValue add_helpers1(JSContext *ctx);
 static void add_helpers(JSContext *ctx);
 
@@ -590,7 +619,8 @@ static void *agent_start(void *arg)
     JSContext *ctx;
     JSValue ret_val;
     int ret;
-
+    int64_t delay;
+    
     rt = JS_NewRuntime();
     if (rt == NULL) {
         fatal(1, "JS_NewRuntime failure");
@@ -611,16 +641,22 @@ static void *agent_start(void *arg)
     free(agent->script);
     agent->script = NULL;
     if (JS_IsException(ret_val))
-        js_std_dump_error(ctx);
+        test262_dump_error(ctx);
     JS_FreeValue(ctx, ret_val);
 
     for(;;) {
         ret = JS_ExecutePendingJob(JS_GetRuntime(ctx), NULL);
         if (ret < 0) {
-            js_std_dump_error(ctx);
+            test262_dump_error(ctx);
             break;
-        } else if (ret == 0) {
+        }
+        delay = JS_AtomicsPollWaiters(ctx);
+        if (ret == 0) {
             if (JS_IsUndefined(agent->broadcast_func)) {
+                if (delay >= 0) {
+                    /* don't exit if there are asynchronous waiters left */
+                    continue;
+                }
                 break;
             } else {
                 JSValue args[2];
@@ -644,7 +680,7 @@ static void *agent_start(void *arg)
                 JS_FreeValue(ctx, args[0]);
                 JS_FreeValue(ctx, args[1]);
                 if (JS_IsException(ret_val))
-                    js_std_dump_error(ctx);
+                    test262_dump_error(ctx);
                 JS_FreeValue(ctx, ret_val);
                 JS_FreeValue(ctx, agent->broadcast_func);
                 agent->broadcast_func = JS_UNDEFINED;
@@ -936,6 +972,11 @@ static JSValue add_helpers1(JSContext *ctx)
 
     JS_SetPropertyStr(ctx, global_obj, "$262", JS_DupValue(ctx, obj262));
 
+#ifdef CONFIG_TEMPORAL_INTL
+    JS_AddIntrinsicTemporal(ctx);
+    JS_AddIntrinsicIntl(ctx);
+#endif
+
     JS_FreeValue(ctx, global_obj);
     return obj262;
 }
@@ -973,7 +1014,9 @@ static JSModuleDef *js_module_loader_test(JSContext *ctx,
     uint8_t *buf;
     JSModuleDef *m;
     char *filename, *slash, path[1024];
-
+    int type;
+    JSValue val;
+    
     // interpret import("bar.js") from path/to/foo.js as
     // import("path/to/bar.js") but leave import("./bar.js") untouched
     filename = opaque;
@@ -986,6 +1029,10 @@ static JSModuleDef *js_module_loader_test(JSContext *ctx,
         }
     }
 
+    type = js_module_import_type(ctx, attributes);
+    if (type < 0)
+        return NULL;
+    
     buf = js_load_file(ctx, &buf_len, module_name);
     if (!buf) {
         JS_ThrowReferenceError(ctx, "could not load module filename '%s'",
@@ -993,13 +1040,34 @@ static JSModuleDef *js_module_loader_test(JSContext *ctx,
         return NULL;
     }
 
-    if (js_module_test_json(ctx, attributes) == 1) {
-        /* compile as JSON */
-        JSValue val;
+    switch(type) {
+    case JS_IMPORT_TYPE_JS:
+        val = JS_Eval(ctx, (char *)buf, buf_len, module_name,
+                      JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+        break;
+    case JS_IMPORT_TYPE_JSON:
         val = JS_ParseJSON(ctx, (char *)buf, buf_len, module_name);
-        js_free(ctx, buf);
-        if (JS_IsException(val))
-            return NULL;
+        break;
+    case JS_IMPORT_TYPE_TEXT:
+        val = JS_NewStringLen(ctx, (char *)buf, buf_len);
+        break;
+    case JS_IMPORT_TYPE_BYTES:
+        val = JS_NewUint8ArrayCopy2(ctx, (uint8_t *)buf, buf_len, TRUE);
+        break;
+    default:
+        val = JS_ThrowInternalError(ctx, "unhandled import type");
+        break;
+    }
+
+    js_free(ctx, buf);
+    if (JS_IsException(val))
+        return NULL;
+
+    if (type == JS_IMPORT_TYPE_JS) {
+        /* the module is already referenced, so we must free it */
+        m = JS_VALUE_GET_PTR(val);
+        JS_FreeValue(ctx, val);
+    } else {
         m = JS_NewCModule(ctx, module_name, json_module_init_test);
         if (!m) {
             JS_FreeValue(ctx, val);
@@ -1008,17 +1076,6 @@ static JSModuleDef *js_module_loader_test(JSContext *ctx,
         /* only export the "default" symbol which will contain the JSON object */
         JS_AddModuleExport(ctx, m, "default");
         JS_SetModulePrivateValue(ctx, m, val);
-    } else {
-        JSValue func_val;
-        /* compile the module */
-        func_val = JS_Eval(ctx, (char *)buf, buf_len, module_name,
-                           JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
-        js_free(ctx, buf);
-        if (JS_IsException(func_val))
-            return NULL;
-        /* the module is already referenced, so we must free it */
-        m = JS_VALUE_GET_PTR(func_val);
-        JS_FreeValue(ctx, func_val);
     }
     return m;
 }
@@ -1401,7 +1458,8 @@ static int eval_buf(JSContext *ctx, const char *buf, size_t buf_len,
     int ret, error_line, pos, pos_line;
     BOOL is_error, has_error_line, ret_promise;
     const char *error_name;
-
+    int64_t delay;
+    
     pos = skip_comments(buf, 1, &pos_line);
     error_line = pos_line;
     has_error_line = FALSE;
@@ -1426,7 +1484,13 @@ static int eval_buf(JSContext *ctx, const char *buf, size_t buf_len,
             if (ret < 0) {
                 res_val = JS_EXCEPTION;
                 break;
-            } else if (ret == 0) {
+            } 
+            delay = JS_AtomicsPollWaiters(ctx);
+            if (ret == 0) {
+                if (delay >= 0) {
+                    /* don't exit if there are asynchronous waiters left */
+                    continue;
+                }
                 if (is_async) {
                     /* test if the test called $DONE() once */
                     if (tls->async_done != 1) {
@@ -1455,10 +1519,13 @@ static int eval_buf(JSContext *ctx, const char *buf, size_t buf_len,
         is_error = JS_IsError(ctx, exception_val);
         /* XXX: should get the filename and line number */
         if (outfile) {
-            if (!is_error)
+            if (!is_error) {
                 fprintf(outfile, "%sThrow: ", (eval_flags & JS_EVAL_FLAG_STRICT) ?
                         "strict mode: " : "");
-            js_print(ctx, JS_NULL, 1, &exception_val);
+                js_dump_obj(ctx, outfile, exception_val);
+            } else {
+                js_print(ctx, JS_NULL, 1, &exception_val);
+            }
         }
         if (is_error) {
             JSValue name, stack;
@@ -1815,7 +1882,7 @@ int run_test(ThreadLocalStorage *tls, const char *filename, int index)
 
     if (new_style) {
         if (!harness) {
-            p = strstr(filename, "test/");
+            p = (char *)strstr(filename, "test/");
             if (p) {
                 snprintf(harnessbuf, sizeof(harnessbuf), "%.*s%s",
                          (int)(p - filename), filename, "harness");
@@ -1907,7 +1974,7 @@ int run_test(ThreadLocalStorage *tls, const char *filename, int index)
         char *ifile;
 
         if (!harness) {
-            p = strstr(filename, "test/");
+            p = (char *)strstr(filename, "test/");
             if (p) {
                 snprintf(harnessbuf, sizeof(harnessbuf), "%.*s%s",
                          (int)(p - filename), filename, "test/harness");
@@ -2057,7 +2124,8 @@ int run_test262_harness_test(ThreadLocalStorage *tls,
     size_t buf_len;
     int eval_flags, ret_code, ret;
     JSValue res_val;
-
+    int64_t delay;
+    
     outfile = stdout; /* for js_print */
 
     rt = JS_NewRuntime();
@@ -2089,7 +2157,7 @@ int run_test262_harness_test(ThreadLocalStorage *tls,
     res_val = JS_Eval(ctx, buf, buf_len, filename, eval_flags);
     ret_code = 0;
     if (JS_IsException(res_val)) {
-       js_std_dump_error(ctx);
+       test262_dump_error(ctx);
        ret_code = 1;
     } else {
         JSValue promise = JS_UNDEFINED;
@@ -2101,9 +2169,12 @@ int run_test262_harness_test(ThreadLocalStorage *tls,
         for(;;) {
             ret = JS_ExecutePendingJob(JS_GetRuntime(ctx), NULL);
             if (ret < 0) {
-                js_std_dump_error(ctx);
+                test262_dump_error(ctx);
                 ret_code = 1;
-            } else if (ret == 0) {
+                break;
+            }
+            delay = JS_AtomicsPollWaiters(ctx);
+            if (ret == 0 && delay < 0) {
                 break;
             }
         }
@@ -2112,7 +2183,7 @@ int run_test262_harness_test(ThreadLocalStorage *tls,
             JSPromiseStateEnum state = JS_PromiseState(ctx, promise);
             if (state == JS_PROMISE_REJECTED) {
                 JS_Throw(ctx, JS_PromiseResult(ctx, promise));
-                js_std_dump_error(ctx);
+                test262_dump_error(ctx);
                 ret_code = 1;
             }
         }

@@ -21,9 +21,9 @@ Msys = "msys2_shell.cmd -defterm -no-start -ucrt64 -here -lc ".
 % tiny bit faster on MacOS x86_64 (lto:12646 vs nolto:12614)
 %
 PreHooks = [
-    {"(linux|darwin)", compile, "make -C quickjs -j8 libquickjs.a qjsc"},
-    {"freebsd", compile, "gmake -C quickjs -j8 libquickjs.a qjsc"},
-    {"win32", compile, Msys ++ "'make -C quickjs -j8 libquickjs.a qjsc.exe'"},
+    {"(linux|darwin)", compile, "make -C quickjs -j8 CONFIG_TEMPORAL_INTL= libquickjs.a qjsc"},
+    {"freebsd", compile, "gmake -C quickjs -j8 CONFIG_TEMPORAL_INTL= libquickjs.a qjsc"},
+    {"win32", compile, Msys ++ "'make -C quickjs -j8 CONFIG_TEMPORAL_INTL= libquickjs.a qjsc.exe'"},
     {"(linux|darwin|freebsd|win32)", compile, "escript build_js.escript compile"}
 ].
 

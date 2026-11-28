@@ -1,4 +1,7 @@
-test262/test/language/statements/expression/S12.4_A1.js:15: unexpected error type: Test262: This statement should not be evaluated
+test262/test/language/statements/await-using/initializer-Symbol.asyncDispose-disposed-at-end-of-imported-module.js:11: SyntaxError: exported variable 'resource' does not exist
+test262/test/language/statements/await-using/initializer-Symbol.dispose-disposed-at-end-of-imported-module.js:11: SyntaxError: exported variable 'resource' does not exist
+test262/test/language/statements/expression/S12.4_A1.js:15: unexpected error type: Test262: This statement should not be evaluated.
+test262/test/language/statements/using/initializer-disposed-at-end-of-imported-module.js:11: SyntaxError: exported variable 'resource' does not exist
 test262/test/staging/sm/Function/arguments-parameter-shadowing.js:14: Test262Error: Expected SameValue(«true», «false») to be true
 test262/test/staging/sm/Function/constructor-binding.js:11: Test262Error: Expected SameValue(«"function"», «"undefined"») to be true
 test262/test/staging/sm/Function/function-bind.js:24: Test262Error: Conforms to NativeFunction Syntax: "function bound unbound() {\n    [native code]\n}"
