@@ -60,6 +60,9 @@ static uint64_t feature_bitmap;
 static FILE *outfile;
 static BOOL byte_swap;
 static BOOL dynamic_export;
+#ifdef CONFIG_TEMPORAL_INTL
+static BOOL enable_experimental;
+#endif
 static const char *c_ident_prefix = "qjsc_";
 
 #define FE_ALL (-1)
@@ -173,7 +176,7 @@ static void dump_hex(FILE *f, const uint8_t *buf, size_t len)
 typedef enum {
     CNAME_TYPE_SCRIPT,
     CNAME_TYPE_MODULE,
-    CNAME_TYPE_JSON_MODULE,
+    CNAME_TYPE_DATA_MODULE,
 } CNameTypeEnum;
 
 static void output_object_code(JSContext *ctx,
@@ -184,7 +187,7 @@ static void output_object_code(JSContext *ctx,
     size_t out_buf_len;
     int flags;
 
-    if (c_name_type == CNAME_TYPE_JSON_MODULE)
+    if (c_name_type == CNAME_TYPE_DATA_MODULE)
         flags = 0;
     else
         flags = JS_WRITE_OBJ_BYTECODE;
@@ -261,8 +264,13 @@ JSModuleDef *jsc_module_loader(JSContext *ctx,
         size_t buf_len;
         uint8_t *buf;
         char cname[1024];
-        int res;
+        int type;
+        JSValue val;
         
+        type = js_module_import_type(ctx, attributes);
+        if (type < 0)
+            return NULL;
+
         buf = js_load_file(ctx, &buf_len, module_name);
         if (!buf) {
             JS_ThrowReferenceError(ctx, "could not load module filename '%s'",
@@ -270,20 +278,52 @@ JSModuleDef *jsc_module_loader(JSContext *ctx,
             return NULL;
         }
 
-        res = js_module_test_json(ctx, attributes);
-        if (has_suffix(module_name, ".json") || res > 0) {
-            /* compile as JSON or JSON5 depending on "type" */
-            JSValue val;
-            int flags;
+        if (type == JS_IMPORT_TYPE_JS) {
+            if (has_suffix(module_name, ".json"))
+                type = JS_IMPORT_TYPE_JSON;
+        }
+        
+        switch(type) {
+        case JS_IMPORT_TYPE_JS:
+            val = JS_Eval(ctx, (char *)buf, buf_len, module_name,
+                          JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+            break;
+        case JS_IMPORT_TYPE_JSON:
+        case JS_IMPORT_TYPE_JSON5:
+            {
+                int flags;
+                if (type == JS_IMPORT_TYPE_JSON5)
+                    flags = JS_PARSE_JSON_EXT;
+                else
+                    flags = 0;
+                val = JS_ParseJSON2(ctx, (char *)buf, buf_len, module_name, flags);
+            }
+            break;
+        case JS_IMPORT_TYPE_TEXT:
+            val = JS_NewStringLen(ctx, (char *)buf, buf_len);
+            break;
+        case JS_IMPORT_TYPE_BYTES:
+            val = JS_NewUint8ArrayCopy2(ctx, (uint8_t *)buf, buf_len, TRUE);
+            break;
+        default:
+            val = JS_ThrowInternalError(ctx, "unhandled import type");
+            break;
+        }
+        js_free(ctx, buf);
+        if (JS_IsException(val))
+            return NULL;
 
-            if (res == 2)
-                flags = JS_PARSE_JSON_EXT;
-            else
-                flags = 0;
-            val = JS_ParseJSON2(ctx, (char *)buf, buf_len, module_name, flags);
-            js_free(ctx, buf);
-            if (JS_IsException(val))
-                return NULL;
+        if (type == JS_IMPORT_TYPE_JS) {
+            get_c_name(cname, sizeof(cname), module_name);
+            if (namelist_find(&cname_list, cname)) {
+                find_unique_cname(cname, sizeof(cname));
+            }
+            output_object_code(ctx, outfile, val, cname, CNAME_TYPE_MODULE);
+            
+            /* the module is already referenced, so we must free it */
+            m = JS_VALUE_GET_PTR(val);
+            JS_FreeValue(ctx, val);
+        } else {
             /* create a dummy module */
             m = JS_NewCModule(ctx, module_name, js_module_dummy_init);
             if (!m) {
@@ -302,26 +342,8 @@ JSModuleDef *jsc_module_loader(JSContext *ctx,
             dump_hex(outfile, (const uint8_t *)module_name, strlen(module_name) + 1);
             fprintf(outfile, "};\n\n");
 
-            output_object_code(ctx, outfile, val, cname, CNAME_TYPE_JSON_MODULE);
+            output_object_code(ctx, outfile, val, cname, CNAME_TYPE_DATA_MODULE);
             JS_FreeValue(ctx, val);
-        } else {
-            JSValue func_val;
-
-            /* compile the module */
-            func_val = JS_Eval(ctx, (char *)buf, buf_len, module_name,
-                               JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
-            js_free(ctx, buf);
-            if (JS_IsException(func_val))
-                return NULL;
-            get_c_name(cname, sizeof(cname), module_name);
-            if (namelist_find(&cname_list, cname)) {
-                find_unique_cname(cname, sizeof(cname));
-            }
-            output_object_code(ctx, outfile, func_val, cname, CNAME_TYPE_MODULE);
-            
-            /* the module is already referenced, so we must free it */
-            m = JS_VALUE_GET_PTR(func_val);
-            JS_FreeValue(ctx, func_val);
         }
     }
     return m;
@@ -406,9 +428,12 @@ void help(void)
            "-x          byte swapped output\n"
            "-p prefix   set the prefix of the generated C names\n"
            "-S n        set the maximum stack size to 'n' bytes (default=%d)\n"
-           "-s            strip all the debug info\n"
-           "--keep-source keep the source code\n",
-           JS_DEFAULT_STACK_SIZE);
+           "-s             strip all the debug info\n"
+           "--keep-source  keep the source code\n"
+#ifdef CONFIG_TEMPORAL_INTL
+           "--experimental enable experimental Temporal and Intl support\n"
+#endif
+           , JS_DEFAULT_STACK_SIZE);
 #ifdef CONFIG_LTO
     {
         int i;
@@ -491,6 +516,12 @@ static int output_executable(const char *out_filename, const char *cfilename,
        libraries */
     *arg++ = "-D";
     *arg++ = "_GNU_SOURCE";
+#ifdef CONFIG_TEMPORAL_INTL
+    if (enable_experimental) {
+        *arg++ = "-D";
+        *arg++ = "CONFIG_TEMPORAL_INTL";
+    }
+#endif
     *arg++ = "-I";
     *arg++ = inc_dir;
     *arg++ = "-o";
@@ -717,6 +748,12 @@ int main(int argc, char **argv)
                 strip_flags = 0;
                 continue;
             }
+#ifdef CONFIG_TEMPORAL_INTL
+            if (!strcmp(longopt, "experimental")) {
+                enable_experimental = TRUE;
+                continue;
+            }
+#endif            
             if (opt) {
                 fprintf(stderr, "qjsc: unknown option '-%c'\n", opt);
             } else {
@@ -807,6 +844,13 @@ int main(int argc, char **argv)
                         feature_list[i].init_name);
             }
         }
+        
+#ifdef CONFIG_TEMPORAL_INTL
+        if (enable_experimental) {
+            fprintf(fo, "  JS_AddIntrinsicTemporal(ctx);\n");
+            fprintf(fo, "  JS_AddIntrinsicIntl(ctx);\n");
+        }
+#endif
         /* add the precompiled modules (XXX: could modify the module
            loader instead) */
         for(i = 0; i < init_module_list.count; i++) {
@@ -825,8 +869,8 @@ int main(int argc, char **argv)
             if (e->flags == CNAME_TYPE_MODULE) {
                 fprintf(fo, "  js_std_eval_binary(ctx, %s, %s_size, 1);\n",
                         e->name, e->name);
-            } else if (e->flags == CNAME_TYPE_JSON_MODULE) {
-                fprintf(fo, "  js_std_eval_binary_json_module(ctx, %s, %s_size, (const char *)%s_module_name);\n",
+            } else if (e->flags == CNAME_TYPE_DATA_MODULE) {
+                fprintf(fo, "  js_std_eval_binary_data_module(ctx, %s, %s_size, (const char *)%s_module_name);\n",
                         e->name, e->name, e->name);
             }
         }

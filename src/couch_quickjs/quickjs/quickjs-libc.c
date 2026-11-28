@@ -155,6 +155,9 @@ typedef struct JSThreadState {
     int next_timer_id; /* for setTimeout() */
     /* not used in the main thread */
     JSWorkerMessagePipe *recv_pipe, *send_pipe;
+    /* used by Atomics.notify to wake up other JSRuntimes for
+       Atomics.waitAsync() */
+    JSWaker atomics_async_waker;
 #if !defined(_WIN32)
     struct pollfd *poll_fds;
     int poll_fds_size;
@@ -606,7 +609,7 @@ static int json_module_init(JSContext *ctx, JSModuleDef *m)
     return 0;
 }
 
-static JSModuleDef *create_json_module(JSContext *ctx, const char *module_name, JSValue val)
+static JSModuleDef *create_data_module(JSContext *ctx, const char *module_name, JSValue val)
 {
     JSModuleDef *m;
     m = JS_NewCModule(ctx, module_name, json_module_init);
@@ -652,8 +655,8 @@ int js_module_check_attributes(JSContext *ctx, void *opaque,
     return ret;
 }
 
-/* return > 0 if the attributes indicate a JSON module */
-int js_module_test_json(JSContext *ctx, JSValueConst attributes)
+/* return the module type according to 'attributes' or -1 if error */
+int js_module_import_type(JSContext *ctx, JSValueConst attributes)
 {
     JSValue str;
     const char *cstr;
@@ -661,21 +664,29 @@ int js_module_test_json(JSContext *ctx, JSValueConst attributes)
     BOOL res;
 
     if (JS_IsUndefined(attributes))
-        return FALSE;
+        return JS_IMPORT_TYPE_JS;
     str = JS_GetPropertyStr(ctx, attributes, "type");
+    if (JS_IsException(str))
+        return -1;
     if (!JS_IsString(str))
-        return FALSE;
+        return JS_IMPORT_TYPE_JS;
     cstr = JS_ToCStringLen(ctx, &len, str);
     JS_FreeValue(ctx, str);
     if (!cstr)
-        return FALSE;
+        return -1;
     /* XXX: raise an error if unknown type ? */
     if (len == 4 && !memcmp(cstr, "json", len)) {
-        res = 1;
+        res = JS_IMPORT_TYPE_JSON;
     } else if (len == 5 && !memcmp(cstr, "json5", len)) {
-        res = 2;
+        res = JS_IMPORT_TYPE_JSON5;
+    } else if (len == 4 && !memcmp(cstr, "text", len)) {
+        res = JS_IMPORT_TYPE_TEXT;
+    } else if (len == 5 && !memcmp(cstr, "bytes", len)) {
+        res = JS_IMPORT_TYPE_BYTES;
     } else {
-        res = 0;
+        /* unknown type - throw error */
+        JS_ThrowTypeError(ctx, "unsupported module type: '%s'", cstr);
+        res = -1;
     }
     JS_FreeCString(ctx, cstr);
     return res;
@@ -686,13 +697,18 @@ JSModuleDef *js_module_loader(JSContext *ctx,
                               JSValueConst attributes)
 {
     JSModuleDef *m;
-    int res;
     
     if (has_suffix(module_name, ".so")) {
         m = js_module_loader_so(ctx, module_name);
     } else {
         size_t buf_len;
         uint8_t *buf;
+        int type;
+        JSValue val;
+        
+        type = js_module_import_type(ctx, attributes);
+        if (type < 0)
+            return NULL;
 
         buf = js_load_file(ctx, &buf_len, module_name);
         if (!buf) {
@@ -700,35 +716,53 @@ JSModuleDef *js_module_loader(JSContext *ctx,
                                    module_name);
             return NULL;
         }
-        res = js_module_test_json(ctx, attributes);
-        if (has_suffix(module_name, ".json") || res > 0) {
-            /* compile as JSON or JSON5 depending on "type" */
-            JSValue val;
-            int flags;
-            if (res == 2)
-                flags = JS_PARSE_JSON_EXT;
-            else
-                flags = 0;
-            val = JS_ParseJSON2(ctx, (char *)buf, buf_len, module_name, flags);
-            js_free(ctx, buf);
-            if (JS_IsException(val))
-                return NULL;
-            m = create_json_module(ctx, module_name, val);
+
+        /* the .json suffix only selects the JSON type when no type attribute
+           was given, so that e.g. 'with { type: "text" }' is honored */
+        if (type == JS_IMPORT_TYPE_JS) {
+            if (has_suffix(module_name, ".json"))
+                type = JS_IMPORT_TYPE_JSON;
+        }
+
+        switch(type) {
+        case JS_IMPORT_TYPE_JS:
+            val = JS_Eval(ctx, (char *)buf, buf_len, module_name,
+                          JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+            break;
+        case JS_IMPORT_TYPE_JSON:
+        case JS_IMPORT_TYPE_JSON5:
+            {
+                int flags;
+                if (type == JS_IMPORT_TYPE_JSON5)
+                    flags = JS_PARSE_JSON_EXT;
+                else
+                    flags = 0;
+                val = JS_ParseJSON2(ctx, (char *)buf, buf_len, module_name, flags);
+            }
+            break;
+        case JS_IMPORT_TYPE_TEXT:
+            val = JS_NewStringLen(ctx, (char *)buf, buf_len);
+            break;
+        case JS_IMPORT_TYPE_BYTES:
+            val = JS_NewUint8ArrayCopy2(ctx, (uint8_t *)buf, buf_len, TRUE);
+            break;
+        default:
+            val = JS_ThrowInternalError(ctx, "unhandled import type");
+            break;
+        }
+        js_free(ctx, buf);
+        if (JS_IsException(val))
+            return NULL;
+        
+        if (type == JS_IMPORT_TYPE_JS) {
+            js_module_set_import_meta(ctx, val, TRUE, FALSE);
+            /* the module is already referenced, so we must free it */
+            m = JS_VALUE_GET_PTR(val);
+            JS_FreeValue(ctx, val);
+        } else {
+            m = create_data_module(ctx, module_name, val);
             if (!m)
                 return NULL;
-        } else {
-            JSValue func_val;
-            /* compile the module */
-            func_val = JS_Eval(ctx, (char *)buf, buf_len, module_name,
-                               JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
-            js_free(ctx, buf);
-            if (JS_IsException(func_val))
-                return NULL;
-            /* XXX: could propagate the exception */
-            js_module_set_import_meta(ctx, func_val, TRUE, FALSE);
-            /* the module is already referenced, so we must free it */
-            m = JS_VALUE_GET_PTR(func_val);
-            JS_FreeValue(ctx, func_val);
         }
     }
     return m;
@@ -1213,6 +1247,31 @@ static JSValue js_std_file_printObject(JSContext *ctx, JSValueConst this_val,
     return JS_UNDEFINED;
 }
 
+/* for testing only */
+
+static void js_sprint_value_write(void *opaque, const char *buf, size_t len)
+{
+    DynBuf *dbuf = opaque;
+    dbuf_put(dbuf, (const uint8_t *)buf, len);
+}
+
+static JSValue js_std_file_sprintObject(JSContext *ctx, JSValueConst this_val,
+                                       int argc, JSValueConst *argv)
+{
+    DynBuf dbuf;
+    JSValue res;
+
+    dbuf_init2(&dbuf, JS_GetRuntime(ctx), (DynBufReallocFunc *)js_realloc_rt);
+    JS_PrintValue(ctx, js_sprint_value_write, &dbuf, argv[0], NULL);
+    if (dbuf_error(&dbuf)) {
+        res = JS_ThrowOutOfMemory(ctx);
+    } else {
+        res = JS_NewStringLen(ctx, (const char *)dbuf.buf, dbuf.size);
+    }
+    dbuf_free(&dbuf);
+    return res;
+}
+
 static JSValue js_std_file_flush(JSContext *ctx, JSValueConst this_val,
                                  int argc, JSValueConst *argv)
 {
@@ -1650,7 +1709,7 @@ static const JSCFunctionListEntry js_std_funcs[] = {
     JS_CFUNC_DEF("evalScript", 1, js_evalScript ),
     JS_CFUNC_DEF("loadScript", 1, js_loadScript ),
     JS_CFUNC_DEF("getenv", 1, js_std_getenv ),
-    JS_CFUNC_DEF("setenv", 1, js_std_setenv ),
+    JS_CFUNC_DEF("setenv", 2, js_std_setenv ),
     JS_CFUNC_DEF("unsetenv", 1, js_std_unsetenv ),
     JS_CFUNC_DEF("getenviron", 1, js_std_getenviron ),
     JS_CFUNC_DEF("urlGet", 1, js_std_urlGet ),
@@ -1671,6 +1730,7 @@ static const JSCFunctionListEntry js_std_funcs[] = {
     JS_PROP_INT32_DEF("SEEK_END", SEEK_END, JS_PROP_CONFIGURABLE ),
     JS_OBJECT_DEF("Error", js_std_error_props, countof(js_std_error_props), JS_PROP_CONFIGURABLE),
     JS_CFUNC_DEF("__printObject", 1, js_std_file_printObject ),
+    JS_CFUNC_DEF("__sprintObject", 1, js_std_file_sprintObject ),
 };
 
 static const JSCFunctionListEntry js_std_file_proto_funcs[] = {
@@ -2309,6 +2369,8 @@ static int js_waker_init(JSWaker *w)
 
     if (pipe(fds) < 0)
         return -1;
+    fcntl(fds[0], F_SETFL, fcntl(fds[0], F_GETFL) | O_NONBLOCK);
+    fcntl(fds[1], F_SETFL, fcntl(fds[1], F_GETFL) | O_NONBLOCK);
     w->read_fd = fds[0];
     w->write_fd = fds[1];
     return 0;
@@ -2322,7 +2384,10 @@ static void js_waker_signal(JSWaker *w)
         ret = write(w->write_fd, "", 1);
         if (ret == 1)
             break;
-        if (ret < 0 && (errno != EAGAIN || errno != EINTR))
+        /* if errno = EAGAIN the pipe is full and we consider it is
+           likely that the poll() will be waked anyway, so we don't
+           need to block */
+        if (ret < 0 && errno != EINTR)
             break;
     }
 }
@@ -2376,6 +2441,10 @@ static int handle_posted_message(JSRuntime *rt, JSContext *ctx,
 
         pthread_mutex_unlock(&ps->mutex);
 
+        /* 'func' might be destroyed when calling itself (if it frees the
+           handler), so must take extra care */
+        func = JS_DupValue(ctx, port->on_message_func);
+
         data_obj = JS_ReadObject(ctx, msg->data, msg->data_len,
                                  JS_READ_OBJ_SAB | JS_READ_OBJ_REFERENCE);
 
@@ -2390,18 +2459,15 @@ static int handle_posted_message(JSRuntime *rt, JSContext *ctx,
         }
         JS_DefinePropertyValueStr(ctx, obj, "data", data_obj, JS_PROP_C_W_E);
 
-        /* 'func' might be destroyed when calling itself (if it frees the
-           handler), so must take extra care */
-        func = JS_DupValue(ctx, port->on_message_func);
         retval = JS_Call(ctx, func, JS_UNDEFINED, 1, (JSValueConst *)&obj);
         JS_FreeValue(ctx, obj);
-        JS_FreeValue(ctx, func);
         if (JS_IsException(retval)) {
         fail:
             js_std_dump_error(ctx);
         } else {
             JS_FreeValue(ctx, retval);
         }
+        JS_FreeValue(ctx, func);
         ret = 1;
     } else {
         pthread_mutex_unlock(&ps->mutex);
@@ -2431,14 +2497,19 @@ static int js_os_poll(JSContext *ctx)
 
     /* XXX: handle signals if useful */
 
+    delay = JS_AtomicsPollWaiters(ctx);
+
     if (list_empty(&ts->os_rw_handlers) && list_empty(&ts->os_timers) &&
-        list_empty(&ts->port_list)) {
+        list_empty(&ts->port_list) && delay < 0) {
         return -1; /* no more events */
     }
     
+    min_delay = 10000;
+    if (delay >= 0 && delay < min_delay)
+        min_delay = delay;
+
     if (!list_empty(&ts->os_timers)) {
         cur_time = get_time_ms();
-        min_delay = 10000;
         list_for_each(el, &ts->os_timers) {
             JSOSTimer *th = list_entry(el, JSOSTimer, link);
             delay = th->timeout - cur_time;
@@ -2455,17 +2526,15 @@ static int js_os_poll(JSContext *ctx)
                 min_delay = delay;
             }
         }
-    } else {
-        min_delay = -1;
     }
 
     count = 0;
     list_for_each(el, &ts->os_rw_handlers) {
         rh = list_entry(el, JSOSRWHandler, link);
         if (rh->fd == 0 && !JS_IsNull(rh->rw_func[0])) {
-            handles[count++] = (HANDLE)_get_osfhandle(rh->fd); // stdin
             if (count == (int)countof(handles))
                 break;
+            handles[count++] = (HANDLE)_get_osfhandle(rh->fd); // stdin
         }
     }
 
@@ -2473,11 +2542,15 @@ static int js_os_poll(JSContext *ctx)
         JSWorkerMessageHandler *port = list_entry(el, JSWorkerMessageHandler, link);
         if (JS_IsNull(port->on_message_func))
             continue;
-        handles[count++] = port->recv_pipe->waker.handle;
         if (count == (int)countof(handles))
             break;
+        handles[count++] = port->recv_pipe->waker.handle;
     }
 
+    if (count < (int)countof(handles)) {
+        handles[count++] = ts->atomics_async_waker.handle;
+    }
+    
     if (count > 0) {
         DWORD ret, timeout = INFINITE;
         if (min_delay != -1)
@@ -2503,6 +2576,10 @@ static int js_os_poll(JSContext *ctx)
                             goto done;
                     }
                 }
+            }
+
+            if (ts->atomics_async_waker.handle == handles[ret]) {
+                js_waker_clear(&ts->atomics_async_waker);
             }
         }
     } else {
@@ -2548,7 +2625,7 @@ static int js_os_poll(JSContext *ctx)
 {
     JSRuntime *rt = JS_GetRuntime(ctx);
     JSThreadState *ts = JS_GetRuntimeOpaque(rt);
-    int min_delay, nfds;
+    int min_delay, nfds, atomics_async_waker_fd_index;
     int64_t cur_time, delay;
     JSOSRWHandler *rh;
     struct list_head *el;
@@ -2570,13 +2647,18 @@ static int js_os_poll(JSContext *ctx)
         }
     }
 
+    delay = JS_AtomicsPollWaiters(ctx);
+
     if (list_empty(&ts->os_rw_handlers) && list_empty(&ts->os_timers) &&
-        list_empty(&ts->port_list))
+        list_empty(&ts->port_list) && delay < 0)
         return -1; /* no more events */
 
+    min_delay = 10000;
+    if (delay >= 0 && delay < min_delay)
+        min_delay = delay;
+    
     if (!list_empty(&ts->os_timers)) {
         cur_time = get_time_ms();
-        min_delay = 10000;
         list_for_each(el, &ts->os_timers) {
             JSOSTimer *th = list_entry(el, JSOSTimer, link);
             delay = th->timeout - cur_time;
@@ -2593,10 +2675,8 @@ static int js_os_poll(JSContext *ctx)
                 min_delay = delay;
             }
         }
-    } else {
-        min_delay = -1; /* infinite */
     }
-
+    
     nfds = 0;
     list_for_each(el, &ts->os_rw_handlers) {
         int events;
@@ -2624,6 +2704,10 @@ static int js_os_poll(JSContext *ctx)
         }
     }
 
+    atomics_async_waker_fd_index = nfds;
+    if (js_poll_add_poll_fd(ts, &nfds, ts->atomics_async_waker.read_fd, POLLIN))
+        return -1;
+
     nfds = poll(ts->poll_fds, nfds, min_delay);
     if (nfds > 0) {
         list_for_each(el, &ts->os_rw_handlers) {
@@ -2650,6 +2734,9 @@ static int js_os_poll(JSContext *ctx)
                         goto done;
                 }
             }
+        }
+        if (ts->poll_fds[atomics_async_waker_fd_index].revents != 0) {
+            js_waker_clear(&ts->atomics_async_waker);
         }
     }
  done:
@@ -3974,7 +4061,7 @@ static const JSCFunctionListEntry js_os_funcs[] = {
     JS_CFUNC_DEF("sleepAsync", 1, js_os_sleepAsync ),
     JS_PROP_STRING_DEF("platform", OS_PLATFORM, 0 ),
     JS_CFUNC_DEF("getcwd", 0, js_os_getcwd ),
-    JS_CFUNC_DEF("chdir", 0, js_os_chdir ),
+    JS_CFUNC_DEF("chdir", 1, js_os_chdir ),
     JS_CFUNC_DEF("mkdir", 1, js_os_mkdir ),
     JS_CFUNC_DEF("readdir", 1, js_os_readdir ),
     /* st_mode constants */
@@ -4130,6 +4217,14 @@ void js_std_add_helpers(JSContext *ctx, int argc, char **argv)
     JS_FreeValue(ctx, global_obj);
 }
 
+static void js_std_atomics_waker(JSRuntime *rt, void *opaque)
+{
+    JSThreadState *ts = JS_GetRuntimeOpaque(rt);
+    if (ts) {
+        js_waker_signal(&ts->atomics_async_waker);
+    }
+}
+
 void js_std_init_handlers(JSRuntime *rt)
 {
     JSThreadState *ts;
@@ -4147,6 +4242,13 @@ void js_std_init_handlers(JSRuntime *rt)
     init_list_head(&ts->rejected_promise_list);
     ts->next_timer_id = 1;
 
+    if (js_waker_init(&ts->atomics_async_waker)) {
+        fprintf(stderr, "Could not create atomics_async_waker\n");
+        exit(1);
+    }
+    /* Note: could be done once */
+    JS_AtomicsSetAsyncWaker(js_std_atomics_waker, NULL);
+    
     JS_SetRuntimeOpaque(rt, ts);
 
 #ifdef USE_WORKER
@@ -4201,6 +4303,8 @@ void js_std_free_handlers(JSRuntime *rt)
     }
 #endif
 
+    js_waker_close(&ts->atomics_async_waker);
+    
 #if !defined(_WIN32)
     free(ts->poll_fds);
 #endif
@@ -4383,7 +4487,7 @@ void js_std_eval_binary(JSContext *ctx, const uint8_t *buf, size_t buf_len,
     }
 }
 
-void js_std_eval_binary_json_module(JSContext *ctx,
+void js_std_eval_binary_data_module(JSContext *ctx,
                                     const uint8_t *buf, size_t buf_len,
                                     const char *module_name)
 {
@@ -4393,7 +4497,7 @@ void js_std_eval_binary_json_module(JSContext *ctx,
     obj = JS_ReadObject(ctx, buf, buf_len, 0);
     if (JS_IsException(obj))
         goto exception;
-    m = create_json_module(ctx, module_name, obj);
+    m = create_data_module(ctx, module_name, obj);
     if (!m) {
     exception:
         js_std_dump_error(ctx);
